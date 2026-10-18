@@ -146,6 +146,10 @@ function bootstrap(): void {
     const headers = new Headers(response.headers);
     headers.set('Content-Security-Policy', CSP);
     headers.set('X-Content-Type-Options', 'nosniff');
+    // index.html jamais mis en cache : une nouvelle version de l'app charge toujours ses nouveaux fichiers.
+    if (headers.get('Content-Type')?.startsWith('text/html')) {
+      headers.set('Cache-Control', 'no-store');
+    }
     return new Response(response.body, { status: response.status, headers });
   });
 

@@ -1,0 +1,51 @@
+# Packaging de l'application de bureau :
+#   macOS   : ./release/build.sh      (ou npm run dist:mac)
+#   Windows : ./release/build-win.sh  (ou npm run dist:win)
+appId: io.github.warnonphilippe.consomazout
+productName: ConsoMazout
+artifactName: consomazout-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release
+  buildResources: build
+
+# esbuild embarque déjà tout le front dans dist/ ; le process principal n'a aucune dépendance
+# (Angular, Chart.js… sont en devDependencies et ne sont donc pas empaquetés).
+files:
+  - dist/consomazout/browser/**/*
+  - dist-electron/**/*.js
+  - package.json
+asar: true
+# Aucun module natif à recompiler pour Electron.
+npmRebuild: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.lifestyle
+  icon: build/icon.icns
+  # Pas de compte Apple Developer : signature ad hoc, indispensable pour qu'une
+  # app arm64 se lance. Sur un autre Mac, lever la quarantaine (voir le guide).
+  identity: '-'
+  hardenedRuntime: false
+
+dmg:
+  title: ConsoMazout ${version}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  # Pas de certificat de signature de code : Windows SmartScreen affichera un avertissement (voir le guide).
+  signAndEditExecutable: true
+
+nsis:
+  # Installation par utilisateur, sans droits administrateur.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ConsoMazout
