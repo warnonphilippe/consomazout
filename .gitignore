@@ -48,3 +48,6 @@ Thumbs.db
 /release/*
 !/release/build.sh
 !/release/build-win.sh
+
+# Outils locaux
+/.claude
