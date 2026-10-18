@@ -39,7 +39,7 @@ export function buildDemoData(now: Date): AppData {
 
   const end = dateToDayNumber(now) - 2;
   let day = dateToDayNumber(new Date(now.getFullYear() - 2, now.getMonth() - 3, 1, 9, 0));
-  let level = capacity * 0.62;
+  let level = capacity * 0.4;
   let nextReading = day;
   let prices = 0.98;
   let id = 0;

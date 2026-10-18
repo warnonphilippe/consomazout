@@ -1,59 +1,91 @@
-# Consomazout
+# ConsoMazout
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.27.
+Application de bureau (**Angular 21 + Electron**) pour suivre la consommation de mazout de la maison :
 
-## Development server
+- **Cuve** décrite une fois : cylindre couché, rectangulaire, cylindre debout ou table de jaugeage, avec la gestion des batteries de cuves.
+- **Relevés** de hauteur, convertis en litres. Ils peuvent être datés dans le passé.
+- **Pleins** avec litres et prix, eux aussi datables dans le passé.
+- **Statistiques** par mois, par saison et par année, avec comparaison à une référence belge.
+- **Prévisions** selon la saison : statistique belge, statistique recalée sur la consommation observée, historique réel de la maison. L'application en déduit la date de commande conseillée.
+- Thèmes **clair / sombre / système**, interface en CSS natif, sans bibliothèque de composants.
 
-To start a local development server, run:
+Le mode d'emploi complet est dans **[docs/GUIDE-UTILISATEUR.md](docs/GUIDE-UTILISATEUR.md)**. Il est aussi lisible dans l'application, page *Aide*.
 
-```bash
-ng serve
-```
+![Tableau de bord](docs/img/dashboard.png)
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Démarrage
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Il faut Node.js 22.12 ou plus récent.
 
 ```bash
-ng generate --help
+npm install
+npm run dev          # Angular (http://localhost:4200) + Electron avec rechargement
+npm run start:prod   # build de production puis lancement d'Electron
+npm test             # tests unitaires (Vitest)
 ```
 
-## Building
+`npm run dev:ng` lance seulement l'interface dans un navigateur. Sans Electron, les données sont alors conservées dans le `localStorage` du navigateur.
 
-To build the project run:
+Un fichier `.npmrc` local force le registre public `registry.npmjs.org`.
+
+## Construire les installeurs
 
 ```bash
-ng build
+./release/build.sh       # release/consomazout-<version>-mac-arm64.dmg (macOS uniquement)
+./release/build-win.sh   # release/consomazout-<version>-win-x64.exe (installeur NSIS)
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Les scripts lancent `npm ci` si les dépendances manquent ou sont périmées, puis les tests, puis `npm run dist:mac` ou `npm run dist:win`.
 
-## Running unit tests
+- L'installeur Windows se construit depuis un Mac sans Wine. Sur Apple Silicon, il faut Rosetta 2 : `softwareupdate --install-rosetta --agree-to-license`.
+- Sur un PC Windows, lancer directement `npm ci && npm run dist:win`.
+- La configuration est dans [`electron-builder.yml`](electron-builder.yml) et les icônes dans [`build/`](build).
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+Les paquets ne sont pas signés. Sur macOS, lever la quarantaine avec `xattr -dr com.apple.quarantine /Applications/ConsoMazout.app`. Sur Windows, SmartScreen demande « Exécuter quand même ».
 
-```bash
-ng test
+## Architecture
+
+```
+electron/                  Process principal (TypeScript → dist-electron/)
+  main.ts                  fenêtre durcie, protocole app://, IPC, thème natif
+  preload.ts               pont contextBridge → window.consoMazout
+  storage.ts               fichier JSON (écriture atomique + copie .bak)
+  shared/ipc-contract.ts   types partagés avec l'interface
+src/app/
+  core/models/             modèle de données, validation des fichiers importés
+  core/calc/               calculs purs et testés :
+    tank-volume.ts           volume selon la forme (segment circulaire, interpolation…)
+    degree-days.ts           degrés-jours normaux d'Uccle, profil de référence
+    consumption.ts           consommation entre relevés, répartition journalière saisonnière
+    stats.ts                 tableaux mensuels, moyennes, saisons, prix
+    forecast.ts              profils de prévision et simulation jour par jour
+    analysis.ts              assemblage complet utilisé par l'interface
+  core/services/           DataStore (signals + sauvegarde auto), stockage, thème, toasts
+  shared/                  icônes SVG, jauge de cuve, enveloppe Chart.js, formats fr-BE
+  pages/                   tableau de bord, relevés, pleins, statistiques, cuve, réglages, aide
+docs/                      guide utilisateur (embarqué dans l'app) et captures d'écran
+release/                   scripts de build .dmg / .exe
 ```
 
-## Running end-to-end tests
+### Données
 
-For end-to-end (e2e) testing, run:
+Toutes les données sont dans un seul fichier JSON :
 
-```bash
-ng e2e
-```
+- macOS : `~/Library/Application Support/ConsoMazout/consomazout.json`
+- Windows : `%APPDATA%\ConsoMazout\consomazout.json`
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Seules les **hauteurs** des relevés sont stockées. Les litres sont toujours recalculés depuis la description de la cuve.
 
-## Additional Resources
+En développement, la variable `CONSOMAZOUT_USER_DATA=/un/dossier` isole les données.
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+### Calcul de la consommation
+
+Entre deux relevés, la consommation vaut `litres(relevé 1) + pleins livrés entre les deux − litres(relevé 2)`.
+
+Elle est répartie jour par jour au prorata d'un poids saisonnier : part d'eau chaude constante, plus part de chauffage proportionnelle aux degrés-jours du mois. Les totaux mensuels restent ainsi réalistes même avec des relevés espacés. Un mois n'entre dans les moyennes que s'il est entièrement couvert par des relevés.
+
+### Données de référence
+
+- Consommation annuelle de référence : 2 000 L/an, réglable. Ordre de grandeur tiré du bilan énergétique wallon (environ 19 300 kWh par ménage pour le chauffage et l'eau chaude) et de la fourchette courante de 1 500 à 2 500 L/an pour une maison de 100 à 150 m².
+- Saisonnalité : degrés-jours 15/15 normaux à Uccle (IRM).
+- Eau chaude : 300 L/an pour 4 personnes (estimation).
