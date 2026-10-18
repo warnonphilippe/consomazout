@@ -143,7 +143,7 @@
             <tbody>
               @for (r of store.refills(); track r.id) {
                 <tr [class.editing]="editingId() === r.id">
-                  <td>{{ r.date | day }}</td>
+                  <td class="date">{{ r.date | day }}</td>
                   <td class="num">{{ r.liters | liters }}</td>
                   <td class="num">{{ r.pricePerLiter | price }}</td>
                   <td class="num">{{ r.totalPrice | euro }}</td>

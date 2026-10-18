@@ -2,7 +2,7 @@
   "name": "consomazout",
   "productName": "ConsoMazout",
   "version": "1.0.0",
-  "description": "Suivi de la consommation de mazout de la maison : contenu de la cuve, pleins, statistiques et prévisions",
+  "description": "Suivi de la consommation de mazout de la maison : contenu de la cuve, pleins, statistiques et pr\u00e9visions",
   "author": "Philippe Warnon",
   "private": true,
   "type": "commonjs",
@@ -22,7 +22,8 @@
     "dist:mac": "npm run build && electron-builder --mac --arm64",
     "dist:win": "npm run build && electron-builder --win --x64 --publish never",
     "test": "ng test --watch=false",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "video": "npm run build && node scripts/video/record-demo.mjs"
   },
   "devDependencies": {
     "@angular/build": "^21.2.27",
@@ -42,6 +43,7 @@
     "electron": "44.9.0",
     "electron-builder": "^26.15.3",
     "jsdom": "^28.0.0",
+    "playwright": "1.64.1",
     "prettier": "^3.8.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

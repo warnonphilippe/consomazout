@@ -633,6 +633,11 @@ input[type='datetime-local'].input::-webkit-calendar-picker-indicator {
   text-align: right;
 }
 
+.table td.date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .table td.actions {
   width: 1%;
   white-space: nowrap;

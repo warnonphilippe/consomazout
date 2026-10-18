@@ -28,6 +28,23 @@ npm test             # tests unitaires (Vitest)
 
 Un fichier `.npmrc` local force le registre public `registry.npmjs.org`.
 
+## Vidéo de présentation
+
+```bash
+npm run video   # build, puis tournage piloté par Playwright → docs/video/consomazout-presentation.mp4
+```
+
+[`scripts/video/record-demo.mjs`](scripts/video/record-demo.mjs) lance l'application Electron avec Playwright, dans un dossier de données temporaire préchargé avec la démo. Il y déroule les cas d'usage principaux :
+
+- encodage d'un relevé, aussi dans le passé ;
+- encodage d'une recharge ;
+- consultation de l'évolution ;
+- prévisions ;
+- statistiques ;
+- passage au thème clair.
+
+Les images sont capturées par le protocole DevTools (screencast), avec sous-titres et curseur dessinés dans la page, puis assemblées en MP4 1920×1200 par ffmpeg (`brew install ffmpeg`). La vidéo générée n'est pas versionnée.
+
 ## Construire les installeurs
 
 ```bash

@@ -108,7 +108,7 @@
               <tbody>
                 @for (row of rows(); track row.reading.id) {
                   <tr [class.editing]="editingId() === row.reading.id">
-                    <td>{{ row.reading.date | day: 'time' }}</td>
+                    <td class="date">{{ row.reading.date | day: 'time' }}</td>
                     <td class="num">{{ row.reading.heightCm | num: 1 }} cm</td>
                     <td class="num">
                       {{ row.liters | liters }} <span class="faint small">{{ row.pct | num }} %</span>
