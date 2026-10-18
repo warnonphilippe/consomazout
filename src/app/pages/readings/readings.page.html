@@ -130,7 +130,10 @@
                       }
                     </td>
                     <td class="num">
-                      @if (row.interval; as i) { {{ i.litersPerDay | num: 1 }} } @else { <span class="faint">—</span> }
+                      @if (row.interval; as i) {
+                        @if (i.days >= 1) { {{ i.litersPerDay | num: 1 }} }
+                        @else { <span class="faint" title="Moins d'un jour depuis le relevé précédent : moyenne non significative">—</span> }
+                      } @else { <span class="faint">—</span> }
                     </td>
                     <td class="note">{{ row.reading.note }}</td>
                     <td class="actions">

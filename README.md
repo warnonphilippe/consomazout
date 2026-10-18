@@ -7,6 +7,7 @@ Application de bureau (**Angular 21 + Electron**) pour suivre la consommation de
 - **Pleins** avec litres et prix, eux aussi datables dans le passé.
 - **Statistiques** par mois, par saison et par année, avec comparaison à une référence belge.
 - **Prévisions** selon la saison : statistique belge, statistique recalée sur la consommation observée, historique réel de la maison. L'application en déduit la date de commande conseillée.
+- **Plusieurs ordinateurs** : export JSON, puis import qui fusionne. Seuls les relevés et pleins absents sont ajoutés ; rien n'est modifié ni supprimé.
 - Thèmes **clair / sombre / système**, interface en CSS natif, sans bibliothèque de composants.
 
 Le mode d'emploi complet est dans **[docs/GUIDE-UTILISATEUR.md](docs/GUIDE-UTILISATEUR.md)**. Il est aussi lisible dans l'application, page *Aide*.
@@ -69,7 +70,7 @@ electron/                  Process principal (TypeScript → dist-electron/)
   storage.ts               fichier JSON (écriture atomique + copie .bak)
   shared/ipc-contract.ts   types partagés avec l'interface
 src/app/
-  core/models/             modèle de données, validation des fichiers importés
+  core/models/             modèle de données, validation et fusion des fichiers importés (merge.ts)
   core/calc/               calculs purs et testés :
     tank-volume.ts           volume selon la forme (segment circulaire, interpolation…)
     degree-days.ts           degrés-jours normaux d'Uccle, profil de référence

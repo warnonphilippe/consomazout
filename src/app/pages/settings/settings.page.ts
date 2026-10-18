@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { monthlyCsv, readingsCsv, refillsCsv } from '../../core/calc/csv';
 import { UCCLE_DEGREE_DAYS } from '../../core/calc/degree-days';
 import { MONTH_SHORT } from '../../core/calc/time';
-import { REFERENCE_PRESETS, type ReferencePreset, type ThemeMode } from '../../core/models/app-data.model';
+import { REFERENCE_PRESETS, type AppData, type ReferencePreset, type ThemeMode } from '../../core/models/app-data.model';
+import type { MergeReport } from '../../core/models/merge';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { DataStore } from '../../core/services/data-store.service';
 import { StorageService } from '../../core/services/storage.service';
@@ -47,10 +48,27 @@ export default class SettingsPage {
     return s.referenceAnnualLiters > 0 ? (s.hotWaterLitersPerYear / s.referenceAnnualLiters) * 100 : 0;
   });
   protected readonly thresholdLiters = computed(() => this.store.analysis().thresholdLiters);
+  protected readonly pendingImport = signal<{ incoming: AppData; report: MergeReport } | null>(null);
+  private readonly importDialog = viewChild<ElementRef<HTMLDialogElement>>('importDialog');
+
   protected readonly counts = computed(() => ({
     readings: this.store.data().readings.length,
     refills: this.store.data().refills.length,
   }));
+
+  constructor() {
+    effect(() => {
+      const dialog = this.importDialog()?.nativeElement;
+      if (!dialog) {
+        return;
+      }
+      if (this.pendingImport() && !dialog.open) {
+        dialog.showModal();
+      } else if (!this.pendingImport() && dialog.open) {
+        dialog.close();
+      }
+    });
+  }
 
   protected selectPreset(key: Exclude<ReferencePreset, 'custom'>): void {
     this.store.updateSettings({ referencePreset: key, referenceAnnualLiters: REFERENCE_PRESETS[key].liters });
@@ -101,25 +119,57 @@ export default class SettingsPage {
     }
   }
 
+  /** Choix d'un fichier exporté, puis aperçu de ce qu'il apporte avant de l'appliquer. */
   protected async importJson(): Promise<void> {
     const content = await this.storage.importFile();
     if (content === null) {
       return;
     }
-    const ok = await this.confirm.ask({
-      title: 'Remplacer les données ?',
-      message: 'Les données actuelles (cuve, relevés, pleins, réglages) seront remplacées par le contenu du fichier importé.',
-      confirmLabel: 'Importer',
-      danger: true,
-    });
-    if (!ok) {
-      return;
-    }
     try {
-      this.store.importJson(content);
-      this.toast.show('Données importées.');
+      const incoming = this.store.parseImport(content);
+      this.pendingImport.set({ incoming, report: this.store.previewMerge(incoming).report });
     } catch (error) {
       this.toast.show(`Import impossible : ${error instanceof Error ? error.message : error}`, 'error');
+    }
+  }
+
+  protected cancelImport(): void {
+    this.pendingImport.set(null);
+  }
+
+  protected applyMerge(): void {
+    const pending = this.pendingImport();
+    if (!pending) {
+      return;
+    }
+    const report = this.store.mergeImport(pending.incoming);
+    this.pendingImport.set(null);
+    const added = report.addedReadings + report.addedRefills;
+    this.toast.show(
+      added > 0
+        ? `${report.addedReadings} relevé(s) et ${report.addedRefills} plein(s) ajoutés ; vos données existantes sont inchangées.`
+        : 'Rien de nouveau dans ce fichier : vos données sont déjà à jour.',
+      added > 0 ? 'success' : 'info',
+    );
+  }
+
+  protected async applyReplace(): Promise<void> {
+    const pending = this.pendingImport();
+    if (!pending) {
+      return;
+    }
+    this.pendingImport.set(null);
+    const ok = await this.confirm.ask({
+      title: 'Remplacer toutes les données ?',
+      message:
+        'La cuve, les relevés, les pleins et les réglages de cet ordinateur seront remplacés par le contenu du fichier. ' +
+        'Les relevés absents du fichier seront perdus.',
+      confirmLabel: 'Tout remplacer',
+      danger: true,
+    });
+    if (ok) {
+      this.store.replaceWithImport(pending.incoming);
+      this.toast.show('Données remplacées par le contenu du fichier.');
     }
   }
 

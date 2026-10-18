@@ -100,7 +100,23 @@
   <div class="section"><span class="pill cyan"><app-icon name="file" [size]="13" /> Données</span></div>
   <div class="grid grid-2">
     <div class="card form">
-      <div class="card-header"><h3>Sauvegarde</h3><span class="hint">{{ counts().readings }} relevés · {{ counts().refills }} pleins</span></div>
+      <div class="card-header">
+        <h3>Partager entre plusieurs ordinateurs</h3>
+        <span class="hint">{{ counts().readings }} relevés · {{ counts().refills }} pleins</span>
+      </div>
+      <ol class="share-steps small muted">
+        <li><strong>Exportez</strong> sur l'ordinateur qui contient les nouveaux relevés ou pleins.</li>
+        <li>Copiez le fichier sur l'autre Mac (iCloud Drive, clé USB, AirDrop…).</li>
+        <li><strong>Importez</strong>-le là : seuls les relevés et pleins absents sont ajoutés, rien n'est modifié ni supprimé.</li>
+      </ol>
+      <div class="row">
+        <button type="button" class="btn primary" (click)="exportJson()"><app-icon name="download" [size]="16" /> Exporter les données (JSON)</button>
+        <button type="button" class="btn" (click)="importJson()"><app-icon name="upload" [size]="16" /> Importer un fichier…</button>
+      </div>
+    </div>
+
+    <div class="card form">
+      <div class="card-header"><h3>Fichier de données</h3></div>
       @if (store.filePath(); as path) {
         <div class="file-path">
           <app-icon name="folder" [size]="16" />
@@ -112,13 +128,10 @@
         <p class="small muted">Version navigateur : les données sont conservées dans le stockage local du navigateur.</p>
       }
       <div class="row">
-        <button type="button" class="btn" (click)="exportJson()"><app-icon name="download" [size]="16" /> Exporter (JSON)</button>
-        <button type="button" class="btn" (click)="importJson()"><app-icon name="upload" [size]="16" /> Importer…</button>
-      </div>
-      <div class="row">
-        <button type="button" class="btn sm" (click)="exportCsv('readings')">Relevés (CSV)</button>
-        <button type="button" class="btn sm" (click)="exportCsv('refills')">Pleins (CSV)</button>
-        <button type="button" class="btn sm" (click)="exportCsv('months')">Conso. mensuelle (CSV)</button>
+        <span class="small muted">Exporter en CSV (Excel) :</span>
+        <button type="button" class="btn sm" (click)="exportCsv('readings')">Relevés</button>
+        <button type="button" class="btn sm" (click)="exportCsv('refills')">Pleins</button>
+        <button type="button" class="btn sm" (click)="exportCsv('months')">Conso. mensuelle</button>
       </div>
     </div>
 
@@ -154,3 +167,56 @@
       la prévision « Historique de la maison » est privilégiée.</p>
   </div>
 </div>
+
+<dialog #importDialog class="modal" (cancel)="cancelImport()">
+  @if (pendingImport(); as p) {
+    <div class="modal-head">
+      <app-icon name="upload" class="tone-accent" />
+      <h2>Importer des données</h2>
+    </div>
+    <div class="modal-body form">
+      <p>Ce fichier contient {{ p.incoming.readings.length }} relevés et {{ p.incoming.refills.length }} pleins.</p>
+      <div class="import-stats">
+        <div class="import-stat added">
+          <span class="value">{{ p.report.addedReadings }}</span>
+          <span class="label">relevé{{ p.report.addedReadings > 1 ? 's' : '' }} à ajouter</span>
+        </div>
+        <div class="import-stat added">
+          <span class="value">{{ p.report.addedRefills }}</span>
+          <span class="label">plein{{ p.report.addedRefills > 1 ? 's' : '' }} à ajouter</span>
+        </div>
+        <div class="import-stat">
+          <span class="value">{{ p.report.duplicateReadings + p.report.duplicateRefills }}</span>
+          <span class="label">déjà présent{{ p.report.duplicateReadings + p.report.duplicateRefills > 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+      @if (p.report.conflicts > 0) {
+        <div class="callout warning small">
+          <app-icon name="alert" [size]="16" />
+          <div>{{ p.report.conflicts }} entrée(s) ont été modifiées différemment sur les deux ordinateurs : la version de cet ordinateur est conservée.</div>
+        </div>
+      }
+      @if (p.report.tankAdopted) {
+        <div class="callout small">
+          <app-icon name="tank" [size]="16" />
+          <div>Aucune cuve n'est configurée ici : celle du fichier (« {{ p.incoming.tank?.name }} ») sera reprise.</div>
+        </div>
+      }
+      @if (p.report.tankDiffers) {
+        <div class="callout warning small">
+          <app-icon name="tank" [size]="16" />
+          <div>La cuve décrite dans le fichier diffère de celle de cet ordinateur : la cuve locale est conservée.</div>
+        </div>
+      }
+      <p class="small muted">« Ajouter » ne modifie ni ne supprime aucune donnée de cet ordinateur ; les réglages locaux sont conservés.</p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost danger-text" (click)="applyReplace()">Tout remplacer…</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" (click)="cancelImport()">Annuler</button>
+      <button type="button" class="btn primary" (click)="applyMerge()" [disabled]="p.report.addedReadings + p.report.addedRefills === 0 && !p.report.tankAdopted">
+        <app-icon name="plus" [size]="16" /> Ajouter les nouvelles données
+      </button>
+    </div>
+  }
+</dialog>

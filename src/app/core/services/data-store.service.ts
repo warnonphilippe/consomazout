@@ -4,6 +4,7 @@ import { buildDemoData } from '../calc/demo-data';
 import { heightForVolume } from '../calc/tank-volume';
 import { dateToDayNumber } from '../calc/time';
 import { emptyData, type AppData, type Reading, type Refill, type Settings, type Tank } from '../models/app-data.model';
+import { mergeData, type MergeReport, type MergeResult } from '../models/merge';
 import { newId, normalizeData } from '../models/normalize';
 import { StorageService } from './storage.service';
 import { ToastService } from './toast.service';
@@ -101,12 +102,26 @@ export class DataStore {
     return tank && best ? heightForVolume(tank, best.currentLiters) : null;
   }
 
-  replaceAll(data: AppData): void {
-    this.update(() => data);
+  /** Lit et valide un fichier exporté (lève une erreur s'il n'est pas reconnu). */
+  parseImport(content: string): AppData {
+    return normalizeData(JSON.parse(content));
   }
 
-  importJson(content: string): void {
-    this.replaceAll(normalizeData(JSON.parse(content)));
+  /** Aperçu de la fusion d'un fichier importé avec les données locales, sans rien modifier. */
+  previewMerge(incoming: AppData): MergeResult {
+    return mergeData(this.state(), incoming);
+  }
+
+  /** Ajoute les relevés et pleins absents du fichier ; les données locales restent intactes. */
+  mergeImport(incoming: AppData): MergeReport {
+    const result = mergeData(this.state(), incoming);
+    this.update(() => result.data);
+    return result.report;
+  }
+
+  /** Remplace toutes les données par celles du fichier (le thème local est conservé). */
+  replaceWithImport(incoming: AppData): void {
+    this.update((d) => ({ ...incoming, settings: { ...incoming.settings, theme: d.settings.theme } }));
   }
 
   loadDemo(): void {
