@@ -1,6 +1,6 @@
-import type { Reading, Refill, Tank } from '../models/app-data.model';
+import { measureOf, type Reading, type Refill, type Tank } from '../models/app-data.model';
 import { forEachDaySlice, seasonalDayWeight } from './degree-days';
-import { capacityLiters, volumeAt } from './tank-volume';
+import { capacityLiters, measureToLiters } from './tank-volume';
 import { daysInMonth, monthKey, toDayNumber, yearMonthOf } from './time';
 
 export interface ReadingLevel {
@@ -51,10 +51,19 @@ export interface TimedRefill {
   readonly day: number;
 }
 
-/** Relevés valides triés chronologiquement, avec leur contenu en litres. */
+/**
+ * Relevés valides triés chronologiquement, avec leur contenu en litres : hauteur convertie selon
+ * la cuve, ou quantité lue sur la jauge. Une hauteur est ignorée si la cuve n'a pas de dimensions (jauge).
+ */
 export function readingLevels(tank: Tank, readings: Reading[]): ReadingLevel[] {
   return readings
-    .map((reading) => ({ reading, day: toDayNumber(reading.date), liters: volumeAt(tank, reading.heightCm) }))
+    .flatMap((reading) => {
+      const measure = measureOf(reading);
+      if (measure === null || (measure.kind === 'height' && tank.shape === 'gauge')) {
+        return [];
+      }
+      return [{ reading, day: toDayNumber(reading.date), liters: measureToLiters(tank, measure) }];
+    })
     .filter((level) => Number.isFinite(level.day) && Number.isFinite(level.liters))
     .sort((a, b) => a.day - b.day || a.reading.id.localeCompare(b.reading.id));
 }

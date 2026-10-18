@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { tankHeightCm, volumeAt } from '../../core/calc/tank-volume';
+import { capacityLiters, measureToLiters, supportsHeight, tankHeightCm } from '../../core/calc/tank-volume';
 import { toLocalIso } from '../../core/calc/time';
-import type { Refill } from '../../core/models/app-data.model';
+import { measureOf, type Measure, type Refill } from '../../core/models/app-data.model';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { DataStore } from '../../core/services/data-store.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -35,6 +35,7 @@ export default class RefillsPage {
     totalPrice: [null as number | null, [Validators.min(0)]],
     supplier: [''],
     heightAfterCm: [null as number | null, [Validators.min(0)]],
+    litersAfter: [null as number | null, [Validators.min(0)]],
     note: [''],
   });
 
@@ -49,15 +50,35 @@ export default class RefillsPage {
     const tank = this.store.tank();
     return tank ? tankHeightCm(tank) : null;
   });
+  protected readonly capacity = computed(() => {
+    const tank = this.store.tank();
+    return tank ? capacityLiters(tank) : null;
+  });
+  protected readonly heightAllowed = computed(() => {
+    const tank = this.store.tank();
+    return tank !== null && supportsHeight(tank);
+  });
+
+  /** Mesure après le plein : hauteur ou quantité lue sur la jauge (par défaut, comme le dernier relevé). */
+  protected readonly afterMode = linkedSignal<Measure['kind']>(() => {
+    if (!this.heightAllowed()) {
+      return 'liters';
+    }
+    const last = this.store.readings()[0];
+    return last && measureOf(last)?.kind === 'liters' ? 'liters' : 'height';
+  });
+
+  private readonly afterMeasure = computed<Measure | null>(() => {
+    const value = this.value();
+    const raw = this.afterMode() === 'height' ? value.heightAfterCm : value.litersAfter;
+    return raw === null || raw === undefined || !Number.isFinite(raw) || raw < 0 ? null : { kind: this.afterMode(), value: raw };
+  });
 
   /** Litres après le plein, d'après la hauteur saisie (si fournie). */
   protected readonly afterPreview = computed(() => {
-    const h = this.value().heightAfterCm;
+    const measure = this.afterMeasure();
     const tank = this.store.tank();
-    if (!tank || h === null || h === undefined || !Number.isFinite(h)) {
-      return null;
-    }
-    return volumeAt(tank, h);
+    return tank && measure?.kind === 'height' ? measureToLiters(tank, measure) : null;
   });
 
   /** Place libre estimée aujourd'hui : utile pour savoir combien commander. */
@@ -108,7 +129,7 @@ export default class RefillsPage {
         supplier: raw.supplier.trim(),
         note: raw.note.trim(),
       },
-      id === null ? raw.heightAfterCm : null,
+      id === null ? this.afterMeasure() : null,
     );
     this.toast.show(id ? 'Plein modifié.' : `Plein de ${fmt.liters(liters)} enregistré.`);
     this.resetForm();
@@ -123,6 +144,7 @@ export default class RefillsPage {
       totalPrice: refill.totalPrice,
       supplier: refill.supplier,
       heightAfterCm: null,
+      litersAfter: null,
       note: refill.note,
     });
     document.querySelector('.page')?.scrollIntoView({ behavior: 'smooth' });
@@ -153,6 +175,7 @@ export default class RefillsPage {
       totalPrice: null,
       supplier: '',
       heightAfterCm: null,
+      litersAfter: null,
       note: '',
     });
   }

@@ -9,7 +9,7 @@ ConsoMazout suit le contenu de votre cuve à mazout, calcule votre consommation 
 Le principe est simple :
 
 1. Vous décrivez **une seule fois** la cuve : sa forme et ses dimensions intérieures.
-2. Vous encodez **régulièrement un relevé** : la hauteur de mazout mesurée dans la cuve. L'application la convertit en litres.
+2. Vous encodez **régulièrement un relevé** : la hauteur de mazout mesurée dans la cuve, que l'application convertit en litres, ou directement la quantité en litres affichée par la jauge de la cuve.
 3. Vous encodez **chaque plein** : les litres livrés et le prix payé.
 
 À partir de ces données, ConsoMazout reconstitue votre consommation et la compare à des statistiques belges. Il prévoit ensuite l'évolution de la cuve selon la saison et vous indique la date à laquelle commander.
@@ -66,6 +66,7 @@ Choisissez d'abord la **forme** de la cuve :
 | Rectangulaire | longueur, largeur, hauteur | cuve acier ou plastique parallélépipédique |
 | Cylindre debout | diamètre et hauteur | cuve verticale |
 | Table de jaugeage | barème hauteur → litres | forme irrégulière, cuve à parois bombées |
+| Cuve à jauge | capacité totale en litres | cuve dont la jauge affiche les litres et dont on ne connaît pas les dimensions |
 
 Conseils de mesure :
 
@@ -77,7 +78,13 @@ Pour une cuve de forme irrégulière, le fabricant fournit souvent un **barème 
 
 À droite, la page affiche la capacité calculée, un **testeur** (hauteur → litres) et le **barème calculé** tous les 10 cm. Comparez-le avec la jauge de votre cuve pour vérifier vos mesures.
 
-> Modifier la cuve recalcule tout l'historique : seules les hauteurs sont enregistrées, et les litres sont toujours recalculés à partir de la description de la cuve.
+### Cuve équipée d'une jauge en litres
+
+Si votre cuve a une jauge qui affiche directement les **litres** et que vous ne connaissez pas ses dimensions, choisissez **Cuve à jauge** et indiquez seulement sa **capacité totale**, lue sur la plaque de la cuve ou sur la jauge. Les relevés se font alors uniquement en litres.
+
+Si vous connaissez les dimensions, gardez plutôt la forme réelle de la cuve. Vous pourrez encoder chaque relevé au choix en hauteur ou en litres. Si la cuve devient une *Cuve à jauge*, les relevés déjà encodés en hauteur ne peuvent plus être convertis et sont ignorés : la page Cuve vous en avertit avant d'enregistrer.
+
+> Modifier la cuve recalcule tout l'historique. Pour un relevé en hauteur, seule la hauteur est enregistrée, et les litres sont toujours recalculés à partir de la description de la cuve. Un relevé en litres est conservé tel quel.
 
 ## Encoder un relevé
 
@@ -87,18 +94,24 @@ Pour une cuve de forme irrégulière, le fabricant fournit souvent un **barème 
 
 - Avec une **règle ou un bâton gradué** plongé verticalement jusqu'au fond de la cuve : la hauteur mouillée est la hauteur de mazout.
 - Avec une **jauge** mécanique ou électronique graduée en centimètres.
-- Mesurez toujours au même endroit, de préférence au milieu de la cuve. Une précision de 0,5 cm suffit.
+- Avec une **jauge graduée en litres** : relevez simplement la quantité affichée.
+- Pour une mesure en hauteur, mesurez toujours au même endroit, de préférence au milieu de la cuve. Une précision de 0,5 cm suffit.
 
 ### Saisie
 
 1. Ouvrez **Relevés**.
 2. La date et l'heure sont pré-remplies avec l'instant présent. Modifiez-les pour encoder un **relevé passé**.
-3. Encodez la **hauteur en cm**. L'aperçu affiche aussitôt les litres, le pourcentage de remplissage et la consommation depuis le relevé précédent.
-4. Cliquez sur **Ajouter le relevé**.
+3. Choisissez le type de **mesure** :
+   - **Hauteur (cm)** : la hauteur de mazout mesurée, convertie en litres selon la description de la cuve ;
+   - **Quantité (L)** : les litres lus sur la jauge.
 
-Le lien **Estimation pour aujourd'hui** propose la hauteur prévue par l'application, ce qui aide à repérer une erreur de mesure.
+   Le type proposé par défaut est celui du dernier relevé. Pour une *Cuve à jauge*, seule la quantité en litres est proposée.
+4. Encodez la valeur. L'aperçu affiche aussitôt les litres, le pourcentage de remplissage et la consommation depuis le relevé précédent.
+5. Cliquez sur **Ajouter le relevé**.
 
-Le tableau **Historique** affiche, pour chaque relevé, le contenu, la consommation depuis le relevé précédent et la moyenne en litres par jour. Les boutons de la ligne permettent de **modifier** ou de **supprimer** un relevé.
+Le lien **Estimation pour aujourd'hui** propose la hauteur, ou la quantité, prévue par l'application. Il aide à repérer une erreur de mesure.
+
+Le tableau **Historique** affiche, pour chaque relevé, la hauteur mesurée (ou un badge **jauge** pour un relevé encodé en litres), le contenu, la consommation depuis le relevé précédent et la moyenne en litres par jour. La moyenne n'est pas affichée quand deux relevés ont moins d'un jour d'écart. Les boutons de la ligne permettent de **modifier** ou de **supprimer** un relevé.
 
 ### Incohérences
 
@@ -121,7 +134,7 @@ Un relevé toutes les **une à deux semaines** donne de très bonnes statistique
 2. Indiquez la **date de livraison** (passée si nécessaire) et les **litres livrés**, tels qu'indiqués sur la facture.
 3. Encodez le **prix au litre TVAC** ou le **montant total** : l'autre valeur est calculée automatiquement. Le dernier prix payé est proposé par défaut.
 4. Le **fournisseur** est facultatif ; les fournisseurs déjà utilisés sont proposés à la saisie.
-5. **Hauteur mesurée après le plein** (facultatif mais recommandé) : un relevé est créé automatiquement à la même date.
+5. **Mesure après le plein** (facultatif mais recommandé) : la hauteur en cm ou la quantité lue sur la jauge juste après la livraison. Un relevé est créé automatiquement à la même date.
 
 Le lien **Place libre estimée aujourd'hui** remplit les litres avec la quantité qu'on peut encore ajouter dans la cuve. C'est utile au moment de commander.
 
@@ -261,6 +274,9 @@ Encodez-le simplement à sa date : tous les calculs sont refaits. Le badge d'inc
 
 **Le contenu estimé diffère de ma mesure.**
 L'estimation est une prévision faite depuis le dernier relevé. Encodez un nouveau relevé : il fait foi.
+
+**Ma cuve a une jauge qui indique les litres.**
+Encodez vos relevés en **Quantité (L)**. Si vous ne connaissez pas les dimensions de la cuve, décrivez-la comme une *Cuve à jauge* avec sa seule capacité (voir *Configurer la cuve*).
 
 **Je change de cuve.**
 Exportez vos données, puis effacez-les ou modifiez la description de la cuve. Attention : modifier la cuve recalcule aussi les anciens relevés avec les nouvelles dimensions.

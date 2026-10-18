@@ -19,15 +19,16 @@ export function readingsCsv(analysis: ConsumptionAnalysis): string {
     const interval = byTo.get(level.reading.id);
     return line([
       level.reading.date.replace('T', ' '),
-      level.reading.heightCm,
+      level.reading.heightCm ?? '',
       round(level.liters, 0),
+      level.reading.liters !== null ? 'jauge (litres)' : 'hauteur',
       interval ? round(interval.consumed, 0) : '',
       interval ? round(interval.litersPerDay) : '',
       interval?.anomaly ? 'incohérence' : '',
       level.reading.note,
     ]);
   });
-  return [line(['Date', 'Hauteur (cm)', 'Contenu (L)', 'Conso depuis précédent (L)', 'L/jour', 'Alerte', 'Note']), ...rows].join('\r\n');
+  return [line(['Date', 'Hauteur (cm)', 'Contenu (L)', 'Mesure', 'Conso depuis précédent (L)', 'L/jour', 'Alerte', 'Note']), ...rows].join('\r\n');
 }
 
 export function refillsCsv(refills: Refill[]): string {

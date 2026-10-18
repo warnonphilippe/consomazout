@@ -50,3 +50,8 @@
   white-space: nowrap;
   color: var(--text-muted);
 }
+
+.mode-switch {
+  align-self: flex-start;
+  margin-bottom: 4px;
+}

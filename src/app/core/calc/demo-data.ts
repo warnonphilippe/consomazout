@@ -29,6 +29,7 @@ export function buildDemoData(now: Date): AppData {
     heightCm: 130,
     diameterCm: 130,
     calibration: [],
+    capacityLiters: 3053,
     count: 1,
     maxFillPct: 95,
   };
@@ -45,7 +46,7 @@ export function buildDemoData(now: Date): AppData {
   let id = 0;
   const pushReading = (at: number): void => {
     const height = Math.round(heightForVolume(tank, level) * 2) / 2;
-    readings.push({ id: `demo-r${++id}`, date: toLocalIso(dayNumberToDate(at)), heightCm: height, note: '' });
+    readings.push({ id: `demo-r${++id}`, date: toLocalIso(dayNumberToDate(at)), heightCm: height, liters: null, note: '' });
   };
 
   while (day < end) {

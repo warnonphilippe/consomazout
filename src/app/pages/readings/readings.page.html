@@ -2,17 +2,24 @@
   <header class="page-header">
     <div>
       <h1>Relevés</h1>
-      <p class="subtitle">Encodez la hauteur de mazout mesurée dans la cuve. Les relevés peuvent être datés dans le passé.</p>
+      <p class="subtitle">Encodez la hauteur de mazout mesurée, ou la quantité lue sur la jauge. Les relevés peuvent être datés dans le passé.</p>
     </div>
   </header>
 
   @if (!tank()) {
     <div class="callout warning">
       <app-icon name="alert" />
-      <div>Configurez d'abord votre cuve pour pouvoir convertir les hauteurs en litres.
+      <div>Configurez d'abord votre cuve (dimensions, ou capacité si elle a une jauge en litres).
         <a routerLink="/cuve">Configurer la cuve</a></div>
     </div>
   } @else {
+    @if (ignoredHeights() > 0) {
+      <div class="callout warning">
+        <app-icon name="alert" />
+        <div>{{ ignoredHeights() }} relevé(s) encodé(s) en hauteur sont ignorés : la cuve est décrite par sa seule capacité (jauge),
+          sans dimensions pour convertir les centimètres en litres. <a routerLink="/cuve">Décrire les dimensions de la cuve</a></div>
+      </div>
+    }
     <div class="entry-layout">
       <form class="card form entry" [formGroup]="form" (ngSubmit)="save()">
         <div class="card-header">
@@ -25,16 +32,33 @@
         </div>
 
         <div class="field">
-          <label for="height">Hauteur de mazout</label>
-          <div class="input-suffix">
-            <input id="height" class="input big-input" type="number" min="0" [max]="maxHeight()" step="0.5"
-              formControlName="heightCm" placeholder="ex. 64" />
-            <span class="suffix">cm</span>
-          </div>
-          <span class="help">Hauteur du mazout depuis le fond de la cuve (max. {{ maxHeight() | num: 1 }} cm).</span>
-          @if (estimatedHeight() !== null && !editingId()) {
+          <span class="label">Mesure</span>
+          @if (heightAllowed()) {
+            <div class="segmented mode-switch" role="radiogroup" aria-label="Type de mesure">
+              <button type="button" role="radio" [attr.aria-checked]="mode() === 'height'" [class.active]="mode() === 'height'"
+                (click)="setMode('height')"><app-icon name="ruler" [size]="14" /> Hauteur (cm)</button>
+              <button type="button" role="radio" [attr.aria-checked]="mode() === 'liters'" [class.active]="mode() === 'liters'"
+                (click)="setMode('liters')"><app-icon name="gauge" [size]="14" /> Quantité (L)</button>
+            </div>
+          }
+          @if (mode() === 'height') {
+            <div class="input-suffix">
+              <input id="height" class="input big-input" type="number" min="0" [max]="maxHeight()" step="0.5"
+                formControlName="heightCm" placeholder="ex. 64" aria-label="Hauteur de mazout" />
+              <span class="suffix">cm</span>
+            </div>
+            <span class="help">Hauteur du mazout depuis le fond de la cuve (max. {{ maxHeight() | num: 1 }} cm).</span>
+          } @else {
+            <div class="input-suffix">
+              <input id="quantity" class="input big-input" type="number" min="0" [max]="capacity()" step="1"
+                formControlName="liters" placeholder="ex. 1250" aria-label="Quantité de mazout" />
+              <span class="suffix">L</span>
+            </div>
+            <span class="help">Quantité indiquée par la jauge de la cuve (capacité {{ capacity() | liters }}).</span>
+          }
+          @if (estimate() !== null && !editingId()) {
             <button type="button" class="link-btn small" (click)="useEstimate()">
-              Estimation pour aujourd'hui : ~{{ estimatedHeight()! | num: 1 }} cm
+              Estimation pour aujourd'hui : ~{{ mode() === 'height' ? (estimate()! | num: 1) + ' cm' : (estimate()! | liters) }}
             </button>
           }
         </div>
@@ -47,7 +71,9 @@
             </div>
             <div class="bar"><span [style.width.%]="p.pct"></span></div>
             @if (p.tooHigh) {
-              <span class="small tone-warning">Plus haut que la cuve : la valeur sera plafonnée.</span>
+              <span class="small tone-warning">
+                {{ mode() === 'height' ? 'Plus haut que la cuve' : 'Plus que la capacité de la cuve' }} : la valeur sera plafonnée.
+              </span>
             }
             @if (p.since; as s) {
               <span class="small muted">
@@ -72,7 +98,7 @@
           @if (editingId()) {
             <button type="button" class="btn ghost" (click)="resetForm()">Annuler</button>
           }
-          <button type="submit" class="btn primary" [disabled]="form.invalid">
+          <button type="submit" class="btn primary" [disabled]="!canSave()">
             <app-icon name="check" [size]="16" /> {{ editingId() ? 'Enregistrer' : 'Ajouter le relevé' }}
           </button>
         </div>
@@ -89,7 +115,7 @@
         @if (rows().length === 0) {
           <div class="empty">
             <app-icon name="ruler" [size]="28" />
-            <p>Aucun relevé pour l'instant.<br />Mesurez la hauteur de mazout et encodez-la à gauche.</p>
+            <p>Aucun relevé pour l'instant.<br />Mesurez la hauteur de mazout (ou lisez la jauge) et encodez-la à gauche.</p>
           </div>
         } @else {
           <div class="table-wrap">
@@ -109,7 +135,13 @@
                 @for (row of rows(); track row.reading.id) {
                   <tr [class.editing]="editingId() === row.reading.id">
                     <td class="date">{{ row.reading.date | day: 'time' }}</td>
-                    <td class="num">{{ row.reading.heightCm | num: 1 }} cm</td>
+                    <td class="num">
+                      @if (row.reading.liters === null) {
+                        {{ row.reading.heightCm | num: 1 }} cm
+                      } @else {
+                        <span class="badge" title="Quantité lue sur la jauge">jauge</span>
+                      }
+                    </td>
                     <td class="num">
                       {{ row.liters | liters }} <span class="faint small">{{ row.pct | num }} %</span>
                     </td>

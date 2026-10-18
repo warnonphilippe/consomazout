@@ -13,7 +13,7 @@ import {
 
 type Raw = Record<string, unknown>;
 
-const SHAPES: readonly TankShape[] = ['rectangular', 'verticalCylinder', 'horizontalCylinder', 'table'];
+const SHAPES: readonly TankShape[] = ['rectangular', 'verticalCylinder', 'horizontalCylinder', 'table', 'gauge'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?/;
 
 /**
@@ -48,6 +48,7 @@ function normalizeTank(raw: Raw): Tank {
       .filter(isObject)
       .map((p): CalibrationPoint => ({ heightCm: num(p['heightCm'], Number.NaN), liters: num(p['liters'], Number.NaN) }))
       .filter((p) => Number.isFinite(p.heightCm) && Number.isFinite(p.liters)),
+    capacityLiters: num(raw['capacityLiters'], DEFAULT_TANK.capacityLiters),
     count: Math.max(1, Math.round(num(raw['count'], 1))),
     maxFillPct: num(raw['maxFillPct'], DEFAULT_TANK.maxFillPct),
   };
@@ -57,11 +58,19 @@ function normalizeReading(raw: unknown): Reading | null {
   if (!isObject(raw) || !DATE_RE.test(str(raw['date'], ''))) {
     return null;
   }
+  // Les anciens fichiers ne contiennent que la hauteur ; une quantité en litres prime si elle est présente.
+  const liters = num(raw['liters'], Number.NaN);
   const heightCm = num(raw['heightCm'], Number.NaN);
-  if (!Number.isFinite(heightCm)) {
+  if (!Number.isFinite(liters) && !Number.isFinite(heightCm)) {
     return null;
   }
-  return { id: str(raw['id'], newId()), date: normalizeDate(str(raw['date'], '')), heightCm, note: str(raw['note'], '') };
+  return {
+    id: str(raw['id'], newId()),
+    date: normalizeDate(str(raw['date'], '')),
+    heightCm: Number.isFinite(liters) ? null : heightCm,
+    liters: Number.isFinite(liters) ? liters : null,
+    note: str(raw['note'], ''),
+  };
 }
 
 function normalizeRefill(raw: unknown): Refill | null {

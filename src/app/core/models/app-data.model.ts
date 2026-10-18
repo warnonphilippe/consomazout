@@ -2,7 +2,11 @@ import type { ThemeMode } from '../../../../electron/shared/ipc-contract';
 
 export type { ThemeMode };
 
-export type TankShape = 'rectangular' | 'verticalCylinder' | 'horizontalCylinder' | 'table';
+/**
+ * `gauge` : cuve équipée d'une jauge affichant directement les litres, dont on ne connaît que la capacité.
+ * Les relevés se font alors en litres uniquement.
+ */
+export type TankShape = 'rectangular' | 'verticalCylinder' | 'horizontalCylinder' | 'table' | 'gauge';
 
 /** Point d'une table de jaugeage : hauteur mesurée → litres (fournie par le fabricant ou mesurée). */
 export interface CalibrationPoint {
@@ -22,18 +26,44 @@ export interface Tank {
   /** Diamètre (cylindres). */
   diameterCm: number;
   calibration: CalibrationPoint[];
+  /** Capacité totale en litres (cuve à jauge). */
+  capacityLiters: number;
   /** Nombre de cuves identiques reliées entre elles (batterie). */
   count: number;
   /** Remplissage maximal autorisé, en % de la capacité (95 % en général). */
   maxFillPct: number;
 }
 
+/**
+ * Relevé : soit la hauteur de mazout mesurée (convertie en litres selon la cuve),
+ * soit la quantité lue directement sur une jauge. Exactement un des deux est renseigné.
+ */
 export interface Reading {
   id: string;
   /** Date et heure locales, format `YYYY-MM-DDTHH:mm`. */
   date: string;
-  heightCm: number;
+  heightCm: number | null;
+  liters: number | null;
   note: string;
+}
+
+/** Mesure faite lors d'un relevé : hauteur en cm ou quantité en litres. */
+export type Measure = { readonly kind: 'height'; readonly value: number } | { readonly kind: 'liters'; readonly value: number };
+
+export function measureOf(reading: Reading): Measure | null {
+  if (reading.liters !== null && Number.isFinite(reading.liters)) {
+    return { kind: 'liters', value: reading.liters };
+  }
+  if (reading.heightCm !== null && Number.isFinite(reading.heightCm)) {
+    return { kind: 'height', value: reading.heightCm };
+  }
+  return null;
+}
+
+export function measureFields(measure: Measure): Pick<Reading, 'heightCm' | 'liters'> {
+  return measure.kind === 'height'
+    ? { heightCm: measure.value, liters: null }
+    : { heightCm: null, liters: measure.value };
 }
 
 export interface Refill {
@@ -95,6 +125,7 @@ export const DEFAULT_TANK: Tank = {
   heightCm: 130,
   diameterCm: 130,
   calibration: [],
+  capacityLiters: 3000,
   count: 1,
   maxFillPct: 95,
 };

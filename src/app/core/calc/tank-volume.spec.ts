@@ -1,5 +1,5 @@
 import { DEFAULT_TANK, type Tank } from '../models/app-data.model';
-import { capacityLiters, heightForVolume, validateTank, volumeAt } from './tank-volume';
+import { capacityLiters, heightForVolume, measureToLiters, supportsHeight, validateTank, volumeAt } from './tank-volume';
 
 const tank = (patch: Partial<Tank>): Tank => ({ ...DEFAULT_TANK, ...patch });
 
@@ -57,5 +57,21 @@ describe('tank-volume', () => {
     expect(validateTank(tank({ shape: 'rectangular', lengthCm: 0 }))).toHaveLength(1);
     expect(validateTank(tank({ shape: 'table', calibration: [] }))).not.toHaveLength(0);
     expect(validateTank(DEFAULT_TANK)).toEqual([]);
+  });
+
+  it('cuve à jauge : capacité seule, pas de hauteur', () => {
+    const t = tank({ shape: 'gauge', capacityLiters: 2000, count: 3 });
+    expect(capacityLiters(t)).toBe(2000);
+    expect(supportsHeight(t)).toBe(false);
+    expect(validateTank(t)).toEqual([]);
+    expect(validateTank(tank({ shape: 'gauge', capacityLiters: 0 }))).toHaveLength(1);
+  });
+
+  it('mesure en hauteur ou en litres', () => {
+    const t = tank({ shape: 'rectangular', lengthCm: 100, widthCm: 100, heightCm: 100 });
+    expect(measureToLiters(t, { kind: 'height', value: 50 })).toBeCloseTo(500);
+    expect(measureToLiters(t, { kind: 'liters', value: 640 })).toBe(640);
+    expect(measureToLiters(t, { kind: 'liters', value: 1200 })).toBe(1000);
+    expect(measureToLiters(t, { kind: 'liters', value: -5 })).toBe(0);
   });
 });

@@ -86,15 +86,33 @@
 
       @if (!editingId()) {
         <div class="field">
-          <label for="after">Hauteur mesurée après le plein</label>
-          <div class="input-suffix">
-            <input id="after" class="input" type="number" min="0" [max]="maxHeight()" step="0.5" formControlName="heightAfterCm"
-              placeholder="facultatif" />
-            <span class="suffix">cm</span>
-          </div>
+          <span class="label">Mesure après le plein</span>
+          @if (heightAllowed()) {
+            <div class="segmented after-switch" role="radiogroup" aria-label="Type de mesure après le plein">
+              <button type="button" role="radio" [attr.aria-checked]="afterMode() === 'height'" [class.active]="afterMode() === 'height'"
+                (click)="afterMode.set('height')"><app-icon name="ruler" [size]="14" /> Hauteur (cm)</button>
+              <button type="button" role="radio" [attr.aria-checked]="afterMode() === 'liters'" [class.active]="afterMode() === 'liters'"
+                (click)="afterMode.set('liters')"><app-icon name="gauge" [size]="14" /> Quantité (L)</button>
+            </div>
+          }
+          @if (afterMode() === 'height') {
+            <div class="input-suffix">
+              <input id="after" class="input" type="number" min="0" [max]="maxHeight()" step="0.5" formControlName="heightAfterCm"
+                placeholder="facultatif" aria-label="Hauteur mesurée après le plein" />
+              <span class="suffix">cm</span>
+            </div>
+          } @else {
+            <div class="input-suffix">
+              <input id="after-liters" class="input" type="number" min="0" [max]="capacity()" step="1" formControlName="litersAfter"
+                placeholder="facultatif" aria-label="Quantité lue sur la jauge après le plein" />
+              <span class="suffix">L</span>
+            </div>
+          }
           <span class="help">
             @if (afterPreview() !== null) {
               Soit {{ afterPreview() | liters }}. Un relevé sera créé à la même date.
+            } @else if (afterMode() === 'liters' && form.controls.litersAfter.value !== null) {
+              Un relevé de {{ form.controls.litersAfter.value | liters }} sera créé à la même date.
             } @else {
               Recommandé : un relevé juste après le plein rend les calculs plus précis.
             }

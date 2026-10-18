@@ -1,9 +1,18 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { analyze } from '../calc/analysis';
 import { buildDemoData } from '../calc/demo-data';
-import { heightForVolume } from '../calc/tank-volume';
+import { heightForVolume, supportsHeight } from '../calc/tank-volume';
 import { dateToDayNumber } from '../calc/time';
-import { emptyData, type AppData, type Reading, type Refill, type Settings, type Tank } from '../models/app-data.model';
+import {
+  emptyData,
+  measureFields,
+  type AppData,
+  type Measure,
+  type Reading,
+  type Refill,
+  type Settings,
+  type Tank,
+} from '../models/app-data.model';
 import { mergeData, type MergeReport, type MergeResult } from '../models/merge';
 import { newId, normalizeData } from '../models/normalize';
 import { StorageService } from './storage.service';
@@ -74,16 +83,16 @@ export class DataStore {
     this.update((d) => ({ ...d, readings: d.readings.filter((r) => r.id !== id) }));
   }
 
-  /** Enregistre un plein ; si la hauteur après le plein est fournie, un relevé est créé à la même date. */
-  saveRefill(refill: Omit<Refill, 'id'> & { id?: string }, heightAfterCm: number | null): void {
+  /** Enregistre un plein ; si la mesure après le plein est fournie (hauteur ou litres), un relevé est créé à la même date. */
+  saveRefill(refill: Omit<Refill, 'id'> & { id?: string }, after: Measure | null): void {
     const entry: Refill = { ...refill, id: refill.id ?? newId() };
     this.update((d) => {
       let readings = d.readings;
-      if (heightAfterCm !== null) {
+      if (after !== null) {
         readings = upsert(readings, {
           id: newId(),
           date: entry.date,
-          heightCm: heightAfterCm,
+          ...measureFields(after),
           note: 'Relevé après plein',
         });
       }
@@ -95,11 +104,16 @@ export class DataStore {
     this.update((d) => ({ ...d, refills: d.refills.filter((r) => r.id !== id) }));
   }
 
-  /** Hauteur estimée de mazout aujourd'hui (pour pré-remplir les formulaires). */
+  /** Contenu estimé aujourd'hui, en litres (pour pré-remplir les formulaires). */
+  estimatedLitersNow(): number | null {
+    return this.analysis().best?.currentLiters ?? null;
+  }
+
+  /** Hauteur estimée de mazout aujourd'hui ; `null` pour une cuve à jauge (sans dimensions). */
   estimatedHeightNow(): number | null {
     const tank = this.tank();
-    const best = this.analysis().best;
-    return tank && best ? heightForVolume(tank, best.currentLiters) : null;
+    const liters = this.estimatedLitersNow();
+    return tank && supportsHeight(tank) && liters !== null ? heightForVolume(tank, liters) : null;
   }
 
   /** Lit et valide un fichier exporté (lève une erreur s'il n'est pas reconnu). */

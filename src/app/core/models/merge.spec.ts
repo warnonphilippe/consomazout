@@ -1,7 +1,7 @@
 import { DEFAULT_TANK, emptyData, type AppData, type Reading, type Refill } from './app-data.model';
 import { mergeData } from './merge';
 
-const reading = (id: string, date: string, heightCm: number, note = ''): Reading => ({ id, date, heightCm, note });
+const reading = (id: string, date: string, heightCm: number, note = ''): Reading => ({ id, date, heightCm, liters: null, note });
 const refill = (id: string, date: string, liters: number, pricePerLiter = 1): Refill => ({
   id,
   date,
@@ -72,5 +72,17 @@ describe('mergeData', () => {
     const { report } = mergeData(data({}), incoming);
     expect(report.addedReadings).toBe(1);
     expect(report.duplicateReadings).toBe(1);
+  });
+
+  it('distingue un relevé en litres d’un relevé en hauteur à la même date', () => {
+    const local = data({ readings: [reading('a', '2026-03-01T08:00', 60)] });
+    const incoming = data({
+      readings: [
+        { id: 'b', date: '2026-03-01T08:00', heightCm: null, liters: 60, note: '' },
+        { id: 'c', date: '2026-03-02T08:00', heightCm: null, liters: 1200, note: '' },
+      ],
+    });
+    const { report } = mergeData(local, incoming);
+    expect(report.addedReadings).toBe(2);
   });
 });

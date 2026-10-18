@@ -1,11 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { ConsumptionInterval } from '../../core/calc/consumption';
-import { tankHeightCm, volumeAt } from '../../core/calc/tank-volume';
+import { capacityLiters, measureToLiters, supportsHeight, tankHeightCm } from '../../core/calc/tank-volume';
 import { toDayNumber, toLocalIso } from '../../core/calc/time';
-import type { Reading } from '../../core/models/app-data.model';
+import { measureFields, measureOf, type Measure, type Reading } from '../../core/models/app-data.model';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { DataStore } from '../../core/services/data-store.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -18,6 +18,8 @@ interface ReadingRow {
   readonly pct: number;
   readonly interval: ConsumptionInterval | null;
 }
+
+type MeasureKind = Measure['kind'];
 
 @Component({
   selector: 'app-readings-page',
@@ -34,30 +36,62 @@ export default class ReadingsPage {
 
   protected readonly editingId = signal<string | null>(null);
 
+  protected readonly tank = this.store.tank;
+  /** Une cuve à jauge n'a pas de dimensions : on ne peut y encoder que des litres. */
+  protected readonly heightAllowed = computed(() => {
+    const tank = this.tank();
+    return tank !== null && supportsHeight(tank);
+  });
+
+  /** Mode de saisie : par défaut celui du dernier relevé encodé. */
+  protected readonly mode = linkedSignal<MeasureKind>(() => {
+    if (!this.heightAllowed()) {
+      return 'liters';
+    }
+    const last = this.store.readings()[0];
+    return last && measureOf(last)?.kind === 'liters' ? 'liters' : 'height';
+  });
+
   protected readonly form = this.fb.group({
     date: [toLocalIso(new Date()), Validators.required],
-    heightCm: [null as number | null, [Validators.required, Validators.min(0)]],
+    heightCm: [null as number | null, Validators.min(0)],
+    liters: [null as number | null, Validators.min(0)],
     note: [''],
   });
 
   private readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
 
-  protected readonly tank = this.store.tank;
   protected readonly maxHeight = computed(() => {
     const tank = this.tank();
     return tank ? tankHeightCm(tank) : 0;
   });
+  protected readonly capacity = computed(() => {
+    const tank = this.tank();
+    return tank ? capacityLiters(tank) : 0;
+  });
 
-  /** Aperçu en direct du contenu correspondant à la hauteur saisie. */
+  /** Mesure saisie dans le mode courant, ou `null` si le champ est vide ou invalide. */
+  protected readonly measure = computed<Measure | null>(() => {
+    const value = this.value();
+    const raw = this.mode() === 'height' ? value.heightCm : value.liters;
+    return raw === null || raw === undefined || !Number.isFinite(raw) || raw < 0 ? null : { kind: this.mode(), value: raw };
+  });
+
+  protected readonly canSave = computed(() => {
+    this.value();
+    return this.measure() !== null && this.form.controls.date.valid;
+  });
+
+  /** Aperçu en direct du contenu correspondant à la mesure saisie. */
   protected readonly preview = computed(() => {
-    const { heightCm, date } = this.value();
+    const measure = this.measure();
     const tank = this.tank();
     const analysis = this.store.analysis();
-    if (!tank || heightCm === null || heightCm === undefined || !Number.isFinite(heightCm)) {
+    if (!tank || measure === null) {
       return null;
     }
-    const liters = volumeAt(tank, heightCm);
-    const day = toDayNumber(date ?? '');
+    const liters = measureToLiters(tank, measure);
+    const day = toDayNumber(this.value().date ?? '');
     // Relevé précédent (hors relevé en cours d'édition), pour estimer la consommation.
     const previous = analysis.consumption?.levels
       .filter((l) => l.day < day && l.reading.id !== this.editingId())
@@ -73,14 +107,15 @@ export default class ReadingsPage {
     return {
       liters,
       pct: analysis.capacity > 0 ? (liters / analysis.capacity) * 100 : 0,
-      tooHigh: heightCm > this.maxHeight(),
+      tooHigh: measure.kind === 'height' ? measure.value > this.maxHeight() : measure.value > this.capacity(),
       since,
     };
   });
 
-  protected readonly estimatedHeight = computed(() => {
+  /** Valeur estimée pour aujourd'hui dans le mode courant (aide à repérer une erreur de mesure). */
+  protected readonly estimate = computed(() => {
     this.store.analysis();
-    return this.store.estimatedHeightNow();
+    return this.mode() === 'height' ? this.store.estimatedHeightNow() : this.store.estimatedLitersNow();
   });
 
   protected readonly rows = computed<ReadingRow[]>(() => {
@@ -100,30 +135,44 @@ export default class ReadingsPage {
       .reverse();
   });
 
+  /** Relevés en hauteur inutilisables parce que la cuve est décrite comme une cuve à jauge. */
+  protected readonly ignoredHeights = computed(() =>
+    this.heightAllowed() ? 0 : this.store.data().readings.filter((r) => measureOf(r)?.kind === 'height').length,
+  );
+
   protected readonly anomalies = computed(() => this.rows().filter((r) => r.interval?.anomaly).length);
 
+  protected setMode(mode: MeasureKind): void {
+    this.mode.set(mode);
+  }
+
   protected save(): void {
-    if (this.form.invalid) {
+    const measure = this.measure();
+    if (measure === null || this.form.controls.date.invalid) {
       this.form.markAllAsTouched();
       return;
     }
-    const { date, heightCm, note } = this.form.getRawValue();
+    const { date, note } = this.form.getRawValue();
     const id = this.editingId();
-    this.store.saveReading({ ...(id ? { id } : {}), date, heightCm: heightCm!, note: note.trim() });
+    this.store.saveReading({ ...(id ? { id } : {}), date, ...measureFields(measure), note: note.trim() });
     this.toast.show(id ? 'Relevé modifié.' : `Relevé du ${fmt.dateTime(date)} enregistré.`);
     this.resetForm();
   }
 
   protected edit(reading: Reading): void {
+    const measure = measureOf(reading);
     this.editingId.set(reading.id);
-    this.form.setValue({ date: reading.date, heightCm: reading.heightCm, note: reading.note });
+    if (measure) {
+      this.mode.set(measure.kind);
+    }
+    this.form.setValue({ date: reading.date, heightCm: reading.heightCm, liters: reading.liters, note: reading.note });
     document.querySelector('.page')?.scrollIntoView({ behavior: 'smooth' });
   }
 
   protected async remove(reading: Reading): Promise<void> {
     const ok = await this.confirm.ask({
       title: 'Supprimer ce relevé ?',
-      message: `Le relevé du ${fmt.dateTime(reading.date)} (${reading.heightCm} cm) sera supprimé. Les statistiques seront recalculées.`,
+      message: `Le relevé du ${fmt.dateTime(reading.date)} (${describe(reading)}) sera supprimé. Les statistiques seront recalculées.`,
       confirmLabel: 'Supprimer',
       danger: true,
     });
@@ -137,14 +186,24 @@ export default class ReadingsPage {
   }
 
   protected useEstimate(): void {
-    const h = this.estimatedHeight();
-    if (h !== null) {
-      this.form.controls.heightCm.setValue(Math.round(h * 2) / 2);
+    const value = this.estimate();
+    if (value === null) {
+      return;
+    }
+    if (this.mode() === 'height') {
+      this.form.controls.heightCm.setValue(Math.round(value * 2) / 2);
+    } else {
+      this.form.controls.liters.setValue(Math.round(value / 10) * 10);
     }
   }
 
   protected resetForm(): void {
     this.editingId.set(null);
-    this.form.reset({ date: toLocalIso(new Date()), heightCm: null, note: '' });
+    this.form.reset({ date: toLocalIso(new Date()), heightCm: null, liters: null, note: '' });
   }
+}
+
+function describe(reading: Reading): string {
+  const measure = measureOf(reading);
+  return measure?.kind === 'liters' ? fmt.liters(measure.value) : `${reading.heightCm} cm`;
 }

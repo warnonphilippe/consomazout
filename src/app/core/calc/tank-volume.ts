@@ -1,4 +1,4 @@
-import type { CalibrationPoint, Tank } from '../models/app-data.model';
+import type { CalibrationPoint, Measure, Tank } from '../models/app-data.model';
 
 /** Hauteur intérieure maximale mesurable de la cuve, en cm. */
 export function tankHeightCm(tank: Tank): number {
@@ -10,7 +10,21 @@ export function tankHeightCm(tank: Tank): number {
       return tank.diameterCm;
     case 'table':
       return sortedCalibration(tank.calibration).at(-1)?.heightCm ?? 0;
+    case 'gauge':
+      return 0;
   }
+}
+
+/** La cuve permet-elle de convertir une hauteur en litres ? (Non pour une cuve à jauge.) */
+export function supportsHeight(tank: Tank): boolean {
+  return tank.shape !== 'gauge';
+}
+
+/** Contenu (litres) d'une mesure : hauteur convertie selon la cuve, ou litres lus sur la jauge. */
+export function measureToLiters(tank: Tank, measure: Measure): number {
+  return measure.kind === 'height'
+    ? volumeAt(tank, measure.value)
+    : Math.min(Math.max(measure.value, 0), capacityLiters(tank));
 }
 
 /** Volume (litres) contenu pour une hauteur de mazout donnée, toutes cuves de la batterie comprises. */
@@ -20,7 +34,7 @@ export function volumeAt(tank: Tank, heightCm: number): number {
 }
 
 export function capacityLiters(tank: Tank): number {
-  return volumeAt(tank, tankHeightCm(tank));
+  return tank.shape === 'gauge' ? tank.capacityLiters : volumeAt(tank, tankHeightCm(tank));
 }
 
 /** Volume maximal qu'on peut remplir (capacité × remplissage maximal autorisé). */
@@ -72,6 +86,9 @@ export function validateTank(tank: Tank): string[] {
       positive(tank.diameterCm, 'Le diamètre');
       positive(tank.lengthCm, 'La longueur');
       break;
+    case 'gauge':
+      positive(tank.capacityLiters, 'La capacité');
+      break;
     case 'table': {
       const points = sortedCalibration(tank.calibration);
       if (points.length < 2) {
@@ -114,6 +131,8 @@ function singleTankVolume(tank: Tank, h: number): number {
     }
     case 'table':
       return interpolate(sortedCalibration(tank.calibration), h);
+    case 'gauge':
+      return 0;
   }
 }
 

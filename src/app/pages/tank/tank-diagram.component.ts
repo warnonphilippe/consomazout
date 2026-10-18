@@ -45,6 +45,15 @@ import type { TankShape } from '../../core/models/app-data.model';
           <line x1="240" y1="110" x2="240" y2="140" class="dim oil-dim" marker-start="url(#arrow)" marker-end="url(#arrow)" />
           <text x="250" y="100" class="label oil-label" text-anchor="end">h</text>
         }
+        @case ('gauge') {
+          <rect x="55" y="40" width="150" height="110" rx="14" class="face front" />
+          <rect x="56" y="100" width="148" height="49" class="oil" />
+          <circle cx="130" cy="40" r="26" class="face top" />
+          <path d="M112 46 A20 20 0 0 1 148 46" class="dial" />
+          <line x1="130" y1="44" x2="141" y2="30" class="needle" />
+          <circle cx="130" cy="44" r="3" class="needle-dot" />
+          <text x="130" y="170" class="label">Jauge en litres · capacité</text>
+        }
         @case ('table') {
           <rect x="60" y="25" width="140" height="130" rx="10" class="face front" />
           @for (y of [50, 75, 100, 125]; track y) {
@@ -88,6 +97,19 @@ import type { TankShape } from '../../core/models/app-data.model';
     }
     .oil-dim {
       stroke: var(--warning);
+    }
+    .dial {
+      fill: none;
+      stroke: var(--text-faint);
+      stroke-width: 3;
+    }
+    .needle {
+      stroke: var(--danger);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+    }
+    .needle-dot {
+      fill: var(--danger);
     }
     .label {
       fill: var(--text-muted);

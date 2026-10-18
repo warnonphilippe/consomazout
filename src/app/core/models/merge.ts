@@ -85,11 +85,11 @@ function mergeList<T extends { id: string }>(
   return { list, added, duplicates, conflicts };
 }
 
-const readingKey = (r: Reading): string => `${r.date}|${r.heightCm}`;
+const readingKey = (r: Reading): string => `${r.date}|${r.heightCm ?? ''}|${r.liters ?? ''}`;
 const refillKey = (r: Refill): string => `${r.date}|${r.liters}`;
 
 const sameReading = (a: Reading, b: Reading): boolean =>
-  a.date === b.date && a.heightCm === b.heightCm && a.note === b.note;
+  a.date === b.date && a.heightCm === b.heightCm && a.liters === b.liters && a.note === b.note;
 
 const sameRefill = (a: Refill, b: Refill): boolean =>
   a.date === b.date &&

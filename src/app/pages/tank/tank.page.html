@@ -2,9 +2,20 @@
   <header class="page-header">
     <div>
       <h1>Cuve</h1>
-      <p class="subtitle">Dimensions intérieures de la cuve : elles servent à convertir chaque hauteur relevée en litres.</p>
+      <p class="subtitle">Dimensions intérieures de la cuve, pour convertir chaque hauteur relevée en litres, ou sa seule capacité si elle a une jauge en litres.</p>
     </div>
   </header>
+
+  @if (heightReadingsLost() > 0) {
+    <div class="callout warning">
+      <app-icon name="alert" />
+      <div>
+        Une cuve à jauge n'a pas de dimensions : les {{ heightReadingsLost() }} relevé(s) déjà encodé(s) en hauteur (cm)
+        ne pourront plus être convertis en litres et seront ignorés. Gardez plutôt la forme et les dimensions de la cuve :
+        vous pourrez quand même encoder des relevés en litres.
+      </div>
+    </div>
+  }
 
   @if (isNew) {
     <div class="callout">
@@ -13,6 +24,7 @@
         <strong>Première étape : décrivez votre cuve.</strong>
         Choisissez sa forme puis encodez ses dimensions <em>intérieures</em> en centimètres.
         Si le fabricant fournit un barème (hauteur → litres), utilisez la table de jaugeage : c'est le plus précis.
+        Si votre cuve a une jauge qui affiche les litres, choisissez « Cuve à jauge » : sa capacité suffit.
       </div>
     </div>
   }
@@ -75,11 +87,22 @@
             </div>
           }
 
-          <div class="field">
-            <label for="count">Nombre de cuves</label>
-            <input id="count" class="input" type="number" min="1" step="1" formControlName="count" />
-            <span class="help">Batterie de cuves identiques reliées.</span>
-          </div>
+          @if (shape() === 'gauge') {
+            <div class="field">
+              <label for="capacity">Capacité totale</label>
+              <div class="input-suffix">
+                <input id="capacity" class="input" type="number" min="1" step="1" formControlName="capacityLiters" />
+                <span class="suffix">L</span>
+              </div>
+              <span class="help">Indiquée sur la plaque de la cuve ou sur la jauge.</span>
+            </div>
+          } @else {
+            <div class="field">
+              <label for="count">Nombre de cuves</label>
+              <input id="count" class="input" type="number" min="1" step="1" formControlName="count" />
+              <span class="help">Batterie de cuves identiques reliées.</span>
+            </div>
+          }
           <div class="field">
             <label for="maxfill">Remplissage maximal</label>
             <div class="input-suffix">
@@ -169,9 +192,14 @@
             <div class="big tone-success">{{ usable() | liters }}</div>
           </div>
         </div>
-        <div class="small muted">Hauteur maximale mesurable : {{ maxHeight() | num: 1 }} cm</div>
+        @if (shape() === 'gauge') {
+          <div class="small muted">Relevés en litres, tels qu'affichés par la jauge.</div>
+        } @else {
+          <div class="small muted">Hauteur maximale mesurable : {{ maxHeight() | num: 1 }} cm</div>
+        }
       </div>
 
+      @if (shape() !== 'gauge') {
       <div class="card form">
         <div class="card-header"><h3>Tester une hauteur</h3></div>
         <div class="input-suffix">
@@ -195,6 +223,7 @@
           </div>
         }
       </div>
+      }
 
       @if (scale().length > 0) {
         <div class="card flush">

@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { capacityLiters, tankHeightCm, usableCapacityLiters, validateTank, volumeAt } from '../../core/calc/tank-volume';
-import { DEFAULT_TANK, type CalibrationPoint, type Tank, type TankShape } from '../../core/models/app-data.model';
+import { DEFAULT_TANK, measureOf, type CalibrationPoint, type Tank, type TankShape } from '../../core/models/app-data.model';
 import { DataStore } from '../../core/services/data-store.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FORMAT_PIPES } from '../../shared/format';
@@ -34,6 +34,7 @@ export default class TankPage {
     { shape: 'rectangular', label: 'Rectangulaire', hint: 'Cuve parallélépipédique (acier, plastique)' },
     { shape: 'verticalCylinder', label: 'Cylindre debout', hint: 'Cuve verticale' },
     { shape: 'table', label: 'Table de jaugeage', hint: 'Forme irrégulière, barème du fabricant' },
+    { shape: 'gauge', label: 'Cuve à jauge', hint: 'Seule la capacité est connue ; relevés en litres' },
   ];
 
   private readonly initial = this.store.tank() ?? DEFAULT_TANK;
@@ -46,6 +47,7 @@ export default class TankPage {
     widthCm: [this.initial.widthCm],
     heightCm: [this.initial.heightCm],
     diameterCm: [this.initial.diameterCm],
+    capacityLiters: [this.initial.capacityLiters],
     count: [this.initial.count, [Validators.required, Validators.min(1)]],
     maxFillPct: [this.initial.maxFillPct, [Validators.required, Validators.min(1), Validators.max(100)]],
     calibration: this.fb.array(this.initial.calibration.map((p) => this.pointGroup(p))),
@@ -67,6 +69,11 @@ export default class TankPage {
   });
 
   protected readonly errors = computed(() => validateTank(this.draft()));
+
+  /** Relevés encodés en hauteur, inutilisables si la cuve devient une cuve à jauge. */
+  protected readonly heightReadingsLost = computed(() =>
+    this.draft().shape === 'gauge' ? this.store.data().readings.filter((r) => measureOf(r)?.kind === 'height').length : 0,
+  );
   protected readonly shape = computed(() => this.draft().shape);
   protected readonly capacity = computed(() => (this.errors().length === 0 ? capacityLiters(this.draft()) : null));
   protected readonly usable = computed(() => (this.errors().length === 0 ? usableCapacityLiters(this.draft()) : null));
@@ -83,7 +90,7 @@ export default class TankPage {
 
   /** Graduations du barème calculé (tous les 10 cm), utiles pour vérifier ou imprimer. */
   protected readonly scale = computed(() => {
-    if (this.errors().length > 0) {
+    if (this.errors().length > 0 || this.draft().shape === 'gauge') {
       return [];
     }
     const tank = this.draft();

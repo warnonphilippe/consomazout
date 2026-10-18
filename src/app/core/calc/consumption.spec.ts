@@ -4,7 +4,8 @@ import { toDayNumber } from './time';
 
 // Cuve rectangulaire de 100 x 100 cm : 10 L par cm de hauteur.
 const tank: Tank = { ...DEFAULT_TANK, shape: 'rectangular', lengthCm: 100, widthCm: 100, heightCm: 200 };
-const reading = (date: string, heightCm: number, id = date): Reading => ({ id, date, heightCm, note: '' });
+const reading = (date: string, heightCm: number, id = date): Reading => ({ id, date, heightCm, liters: null, note: '' });
+const gauge = (date: string, liters: number, id = date): Reading => ({ id, date, heightCm: null, liters, note: '' });
 const refill = (date: string, liters: number): Refill => ({
   id: date,
   date,
@@ -74,5 +75,33 @@ describe('consumption', () => {
     const half = consumptionBetween(a, toDayNumber('2025-01-01'), toDayNumber('2025-01-16'));
     expect(half.liters).toBeCloseTo(300);
     expect(half.coveredDays).toBeCloseTo(15);
+  });
+
+  it('accepte des relevés en litres (jauge) mélangés à des relevés en hauteur', () => {
+    const a = analyzeConsumption(
+      tank,
+      [reading('2025-01-01T09:00', 150), gauge('2025-01-11T09:00', 1300), reading('2025-01-21T09:00', 110)],
+      [],
+      0.15,
+    );
+    expect(a.levels.map((l) => l.liters)).toEqual([1500, 1300, 1100]);
+    expect(a.intervals.map((i) => i.consumed)).toEqual([200, 200]);
+  });
+
+  it('plafonne une quantité supérieure à la capacité', () => {
+    const a = analyzeConsumption(tank, [gauge('2025-01-01T09:00', 5000)], [], 0.15);
+    expect(a.levels[0]!.liters).toBe(2000);
+  });
+
+  it('cuve à jauge : relevés en litres, hauteurs ignorées', () => {
+    const gaugeTank: Tank = { ...DEFAULT_TANK, shape: 'gauge', capacityLiters: 2500 };
+    const a = analyzeConsumption(
+      gaugeTank,
+      [gauge('2025-01-01T09:00', 2000), reading('2025-01-05T09:00', 80), gauge('2025-01-11T09:00', 1800)],
+      [refill('2025-01-08T09:00', 300)],
+      0.15,
+    );
+    expect(a.levels).toHaveLength(2);
+    expect(a.intervals[0]!.consumed).toBeCloseTo(500);
   });
 });
