@@ -1,0 +1,175 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Pleins</h1>
+      <p class="subtitle">Chaque livraison de mazout, avec son prix. Les pleins peuvent être datés dans le passé.</p>
+    </div>
+  </header>
+
+  <div class="grid grid-kpi">
+    <div class="card kpi">
+      <span class="kpi-label"><app-icon name="truck" [size]="15" /> Livraisons</span>
+      <span class="kpi-value">{{ totals().count }}</span>
+      <span class="kpi-sub">{{ totals().totalLiters | liters }} au total</span>
+    </div>
+    <div class="card kpi">
+      <span class="kpi-label"><app-icon name="euro" [size]="15" /> Dépense totale</span>
+      <span class="kpi-value">{{ totals().totalCost | euro }}</span>
+      <span class="kpi-sub">tous pleins confondus</span>
+    </div>
+    <div class="card kpi">
+      <span class="kpi-label"><app-icon name="trend" [size]="15" /> Prix moyen</span>
+      <span class="kpi-value">{{ totals().averagePrice | price }}</span>
+      <span class="kpi-sub">pondéré par les litres</span>
+    </div>
+    <div class="card kpi">
+      <span class="kpi-label"><app-icon name="clock" [size]="15" /> Dernier prix</span>
+      <span class="kpi-value">{{ totals().lastPrice | price }}</span>
+      <span class="kpi-sub">min {{ totals().minPrice | price }} · max {{ totals().maxPrice | price }}</span>
+    </div>
+  </div>
+
+  <div class="entry-layout">
+    <form class="card form entry" [formGroup]="form" (ngSubmit)="save()">
+      <div class="card-header">
+        <span class="pill cyan"><app-icon name="truck" [size]="13" /> {{ editingId() ? 'Modifier le plein' : 'Nouveau plein' }}</span>
+      </div>
+
+      <div class="field">
+        <label for="date">Date de livraison</label>
+        <input id="date" class="input" type="datetime-local" formControlName="date" />
+      </div>
+
+      <div class="field">
+        <label for="liters">Litres livrés</label>
+        <div class="input-suffix">
+          <input id="liters" class="input big-input" type="number" min="1" step="1" formControlName="liters"
+            (input)="onLitersOrPrice()" placeholder="ex. 1500" />
+          <span class="suffix">L</span>
+        </div>
+        @if (freeSpace() !== null && !editingId()) {
+          <button type="button" class="link-btn small" (click)="useFreeSpace()">
+            Place libre estimée aujourd'hui : ~{{ freeSpace() | liters }}
+          </button>
+        }
+      </div>
+
+      <div class="form-grid two">
+        <div class="field">
+          <label for="price">Prix au litre TVAC</label>
+          <div class="input-suffix">
+            <input id="price" class="input" type="number" min="0" step="0.001" formControlName="pricePerLiter"
+              (input)="onLitersOrPrice()" />
+            <span class="suffix">€/L</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="total">Montant total</label>
+          <div class="input-suffix">
+            <input id="total" class="input" type="number" min="0" step="0.01" formControlName="totalPrice"
+              (input)="onTotal()" />
+            <span class="suffix">€</span>
+          </div>
+        </div>
+      </div>
+      <span class="help small faint">Encodez le prix au litre ou le montant total : l'autre est calculé.</span>
+
+      <div class="field">
+        <label for="supplier">Fournisseur</label>
+        <input id="supplier" class="input" formControlName="supplier" list="suppliers" placeholder="facultatif" />
+        <datalist id="suppliers">
+          @for (s of suppliers(); track s) {
+            <option [value]="s"></option>
+          }
+        </datalist>
+      </div>
+
+      @if (!editingId()) {
+        <div class="field">
+          <label for="after">Hauteur mesurée après le plein</label>
+          <div class="input-suffix">
+            <input id="after" class="input" type="number" min="0" [max]="maxHeight()" step="0.5" formControlName="heightAfterCm"
+              placeholder="facultatif" />
+            <span class="suffix">cm</span>
+          </div>
+          <span class="help">
+            @if (afterPreview() !== null) {
+              Soit {{ afterPreview() | liters }}. Un relevé sera créé à la même date.
+            } @else {
+              Recommandé : un relevé juste après le plein rend les calculs plus précis.
+            }
+          </span>
+        </div>
+      }
+
+      <div class="field">
+        <label for="note">Note</label>
+        <input id="note" class="input" formControlName="note" placeholder="facultatif" />
+      </div>
+
+      <div class="form-actions">
+        @if (editingId()) {
+          <button type="button" class="btn ghost" (click)="resetForm()">Annuler</button>
+        }
+        <button type="submit" class="btn primary" [disabled]="form.invalid">
+          <app-icon name="check" [size]="16" /> {{ editingId() ? 'Enregistrer' : 'Ajouter le plein' }}
+        </button>
+      </div>
+    </form>
+
+    <div class="card flush">
+      <div class="card-header">
+        <h2>Historique des pleins</h2>
+        <span class="badge">{{ store.refills().length }}</span>
+      </div>
+      @if (store.refills().length === 0) {
+        <div class="empty">
+          <app-icon name="truck" [size]="28" />
+          <p>Aucun plein encodé.<br />Ajoutez vos livraisons, même anciennes, pour enrichir les statistiques.</p>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="num">Litres</th>
+                <th class="num">Prix / L</th>
+                <th class="num">Total</th>
+                <th>Fournisseur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of store.refills(); track r.id) {
+                <tr [class.editing]="editingId() === r.id">
+                  <td>{{ r.date | day }}</td>
+                  <td class="num">{{ r.liters | liters }}</td>
+                  <td class="num">{{ r.pricePerLiter | price }}</td>
+                  <td class="num">{{ r.totalPrice | euro }}</td>
+                  <td>
+                    {{ r.supplier }}
+                    @if (r.note) { <span class="faint small"> · {{ r.note }}</span> }
+                  </td>
+                  <td class="actions">
+                    <button type="button" class="icon-btn" (click)="edit(r)" title="Modifier"><app-icon name="edit" [size]="15" /></button>
+                    <button type="button" class="icon-btn danger" (click)="remove(r)" title="Supprimer"><app-icon name="trash" [size]="15" /></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td class="num">{{ totals().totalLiters | liters }}</td>
+                <td class="num">{{ totals().averagePrice | price }}</td>
+                <td class="num">{{ totals().totalCost | euro }}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>

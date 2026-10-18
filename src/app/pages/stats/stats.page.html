@@ -1,0 +1,155 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Statistiques</h1>
+      <p class="subtitle">
+        Consommation reconstituée à partir des relevés et des pleins, répartie jour par jour selon la saison.
+      </p>
+    </div>
+  </header>
+
+  @if (years().length === 0) {
+    <div class="callout">
+      <app-icon name="info" />
+      <div>
+        Il faut au moins deux relevés pour calculer une consommation.
+        <a routerLink="/releves">Encoder des relevés</a> — en attendant, voici la référence belge utilisée pour les prévisions.
+      </div>
+    </div>
+  }
+
+  <div class="section"><span class="pill"><app-icon name="calendar" [size]="13" /> Par saison</span></div>
+  <div class="grid seasons">
+    @for (s of analysis().seasons; track s.key) {
+      <div class="card kpi season" [class]="'card kpi season ' + s.key">
+        <span class="kpi-label"><app-icon [name]="seasonIcon[s.key]" [size]="15" /> {{ s.label }}</span>
+        <span class="kpi-value">
+          @if (s.averageMonthly !== null) { {{ s.averageMonthly | liters }} <small>/ mois</small> } @else { <span class="faint">—</span> }
+        </span>
+        <span class="kpi-sub">
+          @if (s.averageTotal !== null) {
+            {{ s.averageTotal | liters }} par saison ·
+            {{ ratio(s.averageTotal, s.referenceTotal) | num }} % de la référence
+          } @else {
+            référence : {{ s.referenceTotal / 3 | liters }} / mois
+          }
+        </span>
+        <span class="kpi-sub faint small">{{ monthShort[s.months[0]!] }} · {{ monthShort[s.months[1]!] }} · {{ monthShort[s.months[2]!] }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="section"><span class="pill success"><app-icon name="chart" [size]="13" /> Par mois</span></div>
+  <div class="card flush">
+    <div class="card-header">
+      <h2>Consommation mensuelle</h2>
+      <span class="hint">litres · <span class="partial-sample">valeur pâle</span> = mois incomplet (exclu des moyennes)</span>
+    </div>
+    <div class="table-wrap">
+      <table class="table month-table">
+        <thead>
+          <tr>
+            <th>Année</th>
+            @for (m of monthShort; track m) { <th class="num">{{ m }}</th> }
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of years(); track row.year) {
+            <tr>
+              <td><strong>{{ row.year }}</strong></td>
+              @for (cell of row.months; track $index) {
+                <td class="num" [class.partial]="cell && !cell.complete" [title]="cell && !cell.complete ? 'Mois partiellement couvert par les relevés' : ''">
+                  @if (cell) { {{ cell.liters | num }} } @else { <span class="faint">·</span> }
+                </td>
+              }
+              <td class="num" [class.partial]="!row.complete"><strong>{{ row.total | num }}</strong></td>
+            </tr>
+          }
+          <tr class="avg-row">
+            <td>Moyenne</td>
+            @for (a of analysis().averages; track a.month) {
+              <td class="num" [title]="a.count + ' mois complet(s)'">{{ a.average | num }}</td>
+            }
+            <td class="num">{{ averagesTotal() | num }}</td>
+          </tr>
+          <tr class="ref-row">
+            <td>Référence belge</td>
+            @for (v of analysis().reference; track $index) { <td class="num">{{ v | num }}</td> }
+            <td class="num">{{ referenceTotal() | num }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-header">
+        <h2>Année</h2>
+        <span class="spacer"></span>
+        @if (years().length > 0) {
+          <div class="segmented">
+            @for (row of years(); track row.year) {
+              <button type="button" [class.active]="selectedYear() === row.year" (click)="selectedYear.set(row.year)">{{ row.year }}</button>
+            }
+          </div>
+        }
+      </div>
+      <app-chart [build]="yearChart()" [height]="300" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Comparaison des années</h2></div>
+      @if (years().length > 0) {
+        <app-chart [build]="comparisonChart()" [height]="300" />
+      } @else {
+        <div class="empty"><app-icon name="chart" [size]="26" /><p>Pas encore de données.</p></div>
+      }
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card flush">
+      <div class="card-header"><h2>Par année</h2></div>
+      @if (yearlyTotals().length > 0) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Année</th>
+                <th class="num">Consommé</th>
+                <th class="num">Livré</th>
+                <th class="num">Dépense</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (y of yearlyTotals(); track y.year) {
+                <tr>
+                  <td><strong>{{ y.year }}</strong></td>
+                  <td class="num">{{ y.liters | liters }}</td>
+                  <td class="num">{{ y.delivered | liters }}</td>
+                  <td class="num">{{ y.cost | euro }}</td>
+                  <td>
+                    @if (y.complete) { <span class="badge success">année complète</span> }
+                    @else { <span class="badge">{{ y.months }} mois</span> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty"><p>Pas encore de données.</p></div>
+      }
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Prix au litre</h2><span class="hint">à chaque plein</span></div>
+      @if (hasPrices()) {
+        <app-chart [build]="priceChart()" [height]="240" />
+      } @else {
+        <div class="empty"><app-icon name="euro" [size]="26" /><p>Aucun plein avec prix encodé.</p></div>
+      }
+    </div>
+  </div>
+</div>

@@ -71,7 +71,10 @@ export function buildDemoData(now: Date): AppData {
       pushReading(at + 0.01);
     }
     const { year, month } = yearMonthOf(day);
-    const daily = (profile[month]! / daysInMonth(year, month)) * (0.75 + rnd() * 0.5);
+    // Hivers plus ou moins rigoureux d'une année à l'autre.
+    const winter = month >= 8 ? year : year - 1;
+    const yearFactor = 1 + 0.12 * Math.sin(winter * 2.3);
+    const daily = (profile[month]! / daysInMonth(year, month)) * yearFactor * (0.75 + rnd() * 0.5);
     level = Math.max(0, level - daily);
     day += 1;
   }

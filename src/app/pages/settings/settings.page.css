@@ -1,0 +1,104 @@
+.presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.preset strong {
+  font-size: 18px;
+}
+
+.preset:hover {
+  border-color: var(--border-strong);
+}
+
+.preset.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.preset.custom {
+  cursor: default;
+}
+
+.profile {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+  height: 200px;
+}
+
+.profile-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-bar {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.profile-bar span {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--oil-light), var(--oil));
+  min-height: 2px;
+}
+
+.profile-label {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.file-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.file-path code {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

@@ -1,0 +1,153 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Relevés</h1>
+      <p class="subtitle">Encodez la hauteur de mazout mesurée dans la cuve. Les relevés peuvent être datés dans le passé.</p>
+    </div>
+  </header>
+
+  @if (!tank()) {
+    <div class="callout warning">
+      <app-icon name="alert" />
+      <div>Configurez d'abord votre cuve pour pouvoir convertir les hauteurs en litres.
+        <a routerLink="/cuve">Configurer la cuve</a></div>
+    </div>
+  } @else {
+    <div class="entry-layout">
+      <form class="card form entry" [formGroup]="form" (ngSubmit)="save()">
+        <div class="card-header">
+          <span class="pill"><app-icon name="ruler" [size]="13" /> {{ editingId() ? 'Modifier le relevé' : 'Nouveau relevé' }}</span>
+        </div>
+
+        <div class="field">
+          <label for="date">Date et heure du relevé</label>
+          <input id="date" class="input" type="datetime-local" formControlName="date" />
+        </div>
+
+        <div class="field">
+          <label for="height">Hauteur de mazout</label>
+          <div class="input-suffix">
+            <input id="height" class="input big-input" type="number" min="0" [max]="maxHeight()" step="0.5"
+              formControlName="heightCm" placeholder="ex. 64" />
+            <span class="suffix">cm</span>
+          </div>
+          <span class="help">Hauteur du mazout depuis le fond de la cuve (max. {{ maxHeight() | num: 1 }} cm).</span>
+          @if (estimatedHeight() !== null && !editingId()) {
+            <button type="button" class="link-btn small" (click)="useEstimate()">
+              Estimation pour aujourd'hui : ~{{ estimatedHeight()! | num: 1 }} cm
+            </button>
+          }
+        </div>
+
+        @if (preview(); as p) {
+          <div class="preview" [class.warn]="p.tooHigh">
+            <div class="preview-main">
+              <span class="preview-liters">{{ p.liters | liters }}</span>
+              <span class="muted">{{ p.pct | num }} %</span>
+            </div>
+            <div class="bar"><span [style.width.%]="p.pct"></span></div>
+            @if (p.tooHigh) {
+              <span class="small tone-warning">Plus haut que la cuve : la valeur sera plafonnée.</span>
+            }
+            @if (p.since; as s) {
+              <span class="small muted">
+                @if (s.liters >= 0) {
+                  Consommation depuis le relevé précédent : <strong>{{ s.liters | liters }}</strong>
+                  en {{ s.days | num: 1 }} j
+                  @if (s.days > 0) { ({{ s.liters / s.days | num: 1 }} L/j) }
+                } @else {
+                  <span class="tone-warning">Le niveau a monté de {{ -s.liters | liters }} sans plein encodé.</span>
+                }
+              </span>
+            }
+          </div>
+        }
+
+        <div class="field">
+          <label for="note">Note</label>
+          <input id="note" class="input" formControlName="note" placeholder="facultatif" />
+        </div>
+
+        <div class="form-actions">
+          @if (editingId()) {
+            <button type="button" class="btn ghost" (click)="resetForm()">Annuler</button>
+          }
+          <button type="submit" class="btn primary" [disabled]="form.invalid">
+            <app-icon name="check" [size]="16" /> {{ editingId() ? 'Enregistrer' : 'Ajouter le relevé' }}
+          </button>
+        </div>
+      </form>
+
+      <div class="card flush list">
+        <div class="card-header">
+          <h2>Historique</h2>
+          <span class="badge">{{ rows().length }}</span>
+          @if (anomalies() > 0) {
+            <span class="badge warning"><app-icon name="alert" [size]="12" /> {{ anomalies() }} incohérence{{ anomalies() > 1 ? 's' : '' }}</span>
+          }
+        </div>
+        @if (rows().length === 0) {
+          <div class="empty">
+            <app-icon name="ruler" [size]="28" />
+            <p>Aucun relevé pour l'instant.<br />Mesurez la hauteur de mazout et encodez-la à gauche.</p>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th class="num">Hauteur</th>
+                  <th class="num">Contenu</th>
+                  <th class="num">Conso. depuis préc.</th>
+                  <th class="num">L / jour</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of rows(); track row.reading.id) {
+                  <tr [class.editing]="editingId() === row.reading.id">
+                    <td>{{ row.reading.date | day: 'time' }}</td>
+                    <td class="num">{{ row.reading.heightCm | num: 1 }} cm</td>
+                    <td class="num">
+                      {{ row.liters | liters }} <span class="faint small">{{ row.pct | num }} %</span>
+                    </td>
+                    <td class="num">
+                      @if (row.interval; as i) {
+                        @if (i.anomaly) {
+                          <span class="badge warning" title="Le niveau a augmenté sans plein suffisant : plein oublié ou erreur de mesure ?">
+                            <app-icon name="alert" [size]="12" /> +{{ -i.rawConsumed | liters }}
+                          </span>
+                        } @else {
+                          {{ i.consumed | liters }}
+                          @if (i.refilled > 0) {
+                            <span class="badge" title="Plein encodé dans l'intervalle">+ plein</span>
+                          }
+                        }
+                      } @else {
+                        <span class="faint">—</span>
+                      }
+                    </td>
+                    <td class="num">
+                      @if (row.interval; as i) { {{ i.litersPerDay | num: 1 }} } @else { <span class="faint">—</span> }
+                    </td>
+                    <td class="note">{{ row.reading.note }}</td>
+                    <td class="actions">
+                      <button type="button" class="icon-btn" (click)="edit(row.reading)" title="Modifier">
+                        <app-icon name="edit" [size]="15" />
+                      </button>
+                      <button type="button" class="icon-btn danger" (click)="remove(row.reading)" title="Supprimer">
+                        <app-icon name="trash" [size]="15" />
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

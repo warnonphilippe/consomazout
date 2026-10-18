@@ -1,0 +1,61 @@
+.help {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.toc {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.toc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+}
+
+.toc nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.toc nav button {
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toc nav button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.guide {
+  padding: 28px 36px 40px;
+  max-width: 900px;
+  line-height: 1.65;
+}
+
+@media (max-width: 1000px) {
+  .help {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .toc {
+    position: static;
+    max-height: none;
+  }
+}

@@ -1,0 +1,156 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Réglages</h1>
+      <p class="subtitle">Référence de consommation, alertes, apparence et gestion des données.</p>
+    </div>
+  </header>
+
+  <div class="section"><span class="pill warning"><app-icon name="flame" [size]="13" /> Consommation de référence</span></div>
+  <div class="grid grid-2">
+    <div class="card form">
+      <p class="muted">
+        Tant que l'historique de la maison ne couvre pas une année complète, les prévisions s'appuient sur une consommation
+        annuelle de référence, répartie mois par mois selon les degrés-jours normaux de Belgique.
+      </p>
+      <div class="presets">
+        @for (p of presets; track p.key) {
+          <button type="button" class="preset" [class.active]="settings().referencePreset === p.key" (click)="selectPreset(p.key)">
+            <strong>{{ p.liters | liters }}</strong>
+            <span class="small muted">{{ p.label }}</span>
+          </button>
+        }
+        <div class="preset custom" [class.active]="settings().referencePreset === 'custom'">
+          <div class="input-suffix">
+            <input class="input" type="number" min="200" max="10000" step="50" [value]="settings().referenceAnnualLiters"
+              (change)="setNumber('referenceAnnualLiters', $event, 200, 10000)" aria-label="Consommation annuelle personnalisée" />
+            <span class="suffix">L/an</span>
+          </div>
+          <span class="small muted">Personnalisé (ex. ancienne facture)</span>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="hw">Dont eau chaude sanitaire</label>
+          <div class="input-suffix">
+            <input id="hw" class="input" type="number" min="0" max="2000" step="10" [value]="settings().hotWaterLitersPerYear"
+              (change)="setNumber('hotWaterLitersPerYear', $event, 0, 2000)" />
+            <span class="suffix">L/an</span>
+          </div>
+          <span class="help">{{ hotWaterPct() | num }} % du total, consommés toute l'année (≈ 300 L pour 4 personnes). 0 si la chaudière ne fait pas l'eau chaude.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Profil mensuel de référence</h3>
+        <span class="hint">{{ settings().referenceAnnualLiters | liters }} / an</span>
+      </div>
+      <div class="profile">
+        @for (v of reference(); track $index) {
+          <div class="profile-col" [title]="monthShort[$index] + ' : ' + (v | liters) + ' (' + degreeDays[$index] + ' degrés-jours)'">
+            <span class="profile-value">{{ v | num }}</span>
+            <div class="profile-bar"><span [style.height.%]="(v / referenceMax()) * 100"></span></div>
+            <span class="profile-label">{{ monthShort[$index] }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="section"><span class="pill danger"><app-icon name="alert" [size]="13" /> Alertes</span></div>
+  <div class="card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="threshold">Seuil d'alerte</label>
+        <div class="input-suffix">
+          <input id="threshold" class="input" type="number" min="0" max="90" step="1" [value]="settings().alertThresholdPct"
+            (change)="setNumber('alertThresholdPct', $event, 0, 90)" />
+          <span class="suffix">%</span>
+        </div>
+        <span class="help">Niveau à ne pas franchir : {{ thresholdLiters() | liters }} avec la cuve actuelle.</span>
+      </div>
+      <div class="field">
+        <label for="lead">Délai de commande</label>
+        <div class="input-suffix">
+          <input id="lead" class="input" type="number" min="0" max="120" step="1" [value]="settings().orderLeadDays"
+            (change)="setNumber('orderLeadDays', $event, 0, 120)" />
+          <span class="suffix">jours</span>
+        </div>
+        <span class="help">Temps entre la commande et la livraison : la date de commande conseillée est avancée d'autant.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section"><span class="pill violet"><app-icon name="sun" [size]="13" /> Apparence</span></div>
+  <div class="card row">
+    <span>Thème</span>
+    <span class="spacer"></span>
+    <div class="segmented">
+      @for (t of themeModes; track t.mode) {
+        <button type="button" [class.active]="theme.mode() === t.mode" (click)="theme.setMode(t.mode)">
+          <app-icon [name]="t.icon" [size]="15" /> {{ t.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="section"><span class="pill cyan"><app-icon name="file" [size]="13" /> Données</span></div>
+  <div class="grid grid-2">
+    <div class="card form">
+      <div class="card-header"><h3>Sauvegarde</h3><span class="hint">{{ counts().readings }} relevés · {{ counts().refills }} pleins</span></div>
+      @if (store.filePath(); as path) {
+        <div class="file-path">
+          <app-icon name="folder" [size]="16" />
+          <code>{{ path }}</code>
+          <button type="button" class="btn sm" (click)="storage.reveal()">Afficher</button>
+        </div>
+        <p class="small muted">Enregistrement automatique à chaque modification ; la version précédente est conservée en <code>.bak</code>.</p>
+      } @else {
+        <p class="small muted">Version navigateur : les données sont conservées dans le stockage local du navigateur.</p>
+      }
+      <div class="row">
+        <button type="button" class="btn" (click)="exportJson()"><app-icon name="download" [size]="16" /> Exporter (JSON)</button>
+        <button type="button" class="btn" (click)="importJson()"><app-icon name="upload" [size]="16" /> Importer…</button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn sm" (click)="exportCsv('readings')">Relevés (CSV)</button>
+        <button type="button" class="btn sm" (click)="exportCsv('refills')">Pleins (CSV)</button>
+        <button type="button" class="btn sm" (click)="exportCsv('months')">Conso. mensuelle (CSV)</button>
+      </div>
+    </div>
+
+    <div class="card form">
+      <div class="card-header"><h3>Démonstration et réinitialisation</h3></div>
+      <p class="small muted">Les données de démo (cuve de ~3 000 L, deux ans de relevés et de pleins fictifs) permettent de découvrir
+        toutes les fonctions. Pensez à exporter vos données avant.</p>
+      <div class="row">
+        <button type="button" class="btn" (click)="loadDemo()"><app-icon name="sparkles" [size]="16" /> Charger la démo</button>
+        <button type="button" class="btn danger" (click)="reset()"><app-icon name="trash" [size]="16" /> Tout effacer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section"><span class="pill"><app-icon name="book" [size]="13" /> Sources des données de référence</span></div>
+  <div class="card sources">
+    <ul>
+      <li>
+        <strong>Consommation annuelle</strong> — le bilan énergétique de la Wallonie (secteur domestique) estime la consommation
+        moyenne d'un ménage pour le chauffage et l'eau chaude à environ 19 300 kWh/an, soit ≈ 1 950 L de mazout (≈ 10 kWh/L).
+        Une maison de 100 à 150 m² consomme couramment de 1 500 à 2 500 L/an selon son isolation.
+        <a href="https://energie.wallonie.be/servlet/Repository/bilan-2020-domestique-et-equivalents.pdf?ID=76237" target="_blank" rel="noopener">SPW Énergie – bilan domestique</a>
+      </li>
+      <li>
+        <strong>Saisonnalité</strong> — degrés-jours 15/15 normaux à Uccle (IRM) : {{ degreeDays.join(' · ') }} (total ≈ 1 953).
+        <a href="https://www.meteo.be/fr/services/produits-et-services/degres-jours" target="_blank" rel="noopener">IRM – degrés-jours</a>
+      </li>
+      <li>
+        <strong>Eau chaude</strong> — environ 300 L/an pour un ménage de 4 personnes (estimation, ≈ 15 % du total), répartis uniformément.
+      </li>
+    </ul>
+    <p class="small faint">Ces valeurs sont des ordres de grandeur : dès qu'une année complète de relevés est disponible,
+      la prévision « Historique de la maison » est privilégiée.</p>
+  </div>
+</div>

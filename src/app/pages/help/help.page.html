@@ -1,0 +1,13 @@
+<div class="page help">
+  <aside class="toc card">
+    <div class="toc-head"><app-icon name="book" [size]="16" /> Guide utilisateur</div>
+    <input class="input" type="search" placeholder="Rechercher une section…" [value]="filter()"
+      (input)="filter.set($any($event.target).value)" />
+    <nav>
+      @for (h of filteredToc(); track h.id) {
+        <button type="button" (click)="scrollTo(h.id)">{{ h.text }}</button>
+      }
+    </nav>
+  </aside>
+  <article class="card guide md" [innerHTML]="html" (click)="onContentClick($event)"></article>
+</div>

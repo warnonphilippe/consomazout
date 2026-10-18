@@ -1,0 +1,201 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Tableau de bord</h1>
+      <p class="subtitle">
+        @if (analysis().tank; as tank) {
+          {{ tank.name }} · {{ analysis().capacity | liters }}
+          @if (lastLevel(); as l) { · dernier relevé le {{ l.day | day: 'long' }} }
+        } @else {
+          Bienvenue dans ConsoMazout
+        }
+      </p>
+    </div>
+    @if (analysis().tank) {
+      <div class="row">
+        <a class="btn" routerLink="/pleins"><app-icon name="truck" [size]="16" /> Plein</a>
+        <a class="btn primary" routerLink="/releves"><app-icon name="plus" [size]="16" /> Nouveau relevé</a>
+      </div>
+    }
+  </header>
+
+  @if (!analysis().tank) {
+    <section class="card hero">
+      <div class="hero-icon"><app-icon name="droplet" [size]="34" /></div>
+      <div class="hero-text">
+        <h2>Suivez votre cuve à mazout et anticipez le prochain plein</h2>
+        <p class="muted">
+          Décrivez votre cuve une fois, puis encodez régulièrement la hauteur de mazout mesurée.
+          ConsoMazout calcule le contenu, la consommation par mois et par saison, et prévoit quand commander,
+          en s'appuyant au début sur des statistiques belges puis sur votre propre historique.
+        </p>
+        <ol class="steps">
+          <li><strong>Cuve</strong> : forme et dimensions intérieures.</li>
+          <li><strong>Relevés</strong> : hauteur mesurée (aussi dans le passé).</li>
+          <li><strong>Pleins</strong> : litres livrés et prix.</li>
+        </ol>
+        <div class="row">
+          <a class="btn primary" routerLink="/cuve"><app-icon name="tank" [size]="16" /> Configurer ma cuve</a>
+          <button type="button" class="btn" (click)="loadDemo()"><app-icon name="sparkles" [size]="16" /> Essayer avec des données de démo</button>
+        </div>
+      </div>
+    </section>
+  } @else if (!hasReadings()) {
+    <div class="callout">
+      <app-icon name="info" />
+      <div>
+        Encodez votre premier relevé de hauteur pour voir le contenu de la cuve et les prévisions.
+        <a routerLink="/releves">Ajouter un relevé</a>
+      </div>
+    </div>
+  }
+
+  @if (current(); as cur) {
+    <div class="grid kpis">
+      <div class="card kpi level-kpi" [class.alert]="cur.alert">
+        <app-tank-gauge [pct]="cur.pct" [alert]="cur.alert" [thresholdPct]="cur.thresholdPct" />
+        <div>
+          <span class="kpi-label"><app-icon name="droplet" [size]="15" /> Contenu estimé</span>
+          <span class="kpi-value" [class.tone-danger]="cur.alert">{{ cur.liters | liters }}</span>
+          <span class="kpi-sub">{{ cur.pct | num }} % · place libre {{ cur.free | liters }}</span>
+        </div>
+      </div>
+
+      @if (order(); as o) {
+        <div class="card kpi" [class.attention]="o.kind === 'now' || o.kind === 'below'">
+          <span class="kpi-label"><app-icon name="calendar" [size]="15" /> Prochain plein</span>
+          @switch (o.kind) {
+            @case ('planned') {
+              <span class="kpi-value">{{ o.best.orderDay | day }}</span>
+              <span class="kpi-sub">commander d'ici {{ o.inDays }} j · seuil le {{ o.best.alertDay | day }}</span>
+            }
+            @case ('now') {
+              <span class="kpi-value tone-warning">À commander</span>
+              <span class="kpi-sub">seuil atteint vers le {{ o.best.alertDay | day }}</span>
+            }
+            @case ('below') {
+              <span class="kpi-value tone-danger">Sous le seuil</span>
+              <span class="kpi-sub">
+                @if (o.best.emptyDay !== null) { cuve vide vers le {{ o.best.emptyDay | day }} } @else { commandez dès que possible }
+              </span>
+            }
+            @case ('later') {
+              <span class="kpi-value tone-success">Pas avant 18 mois</span>
+              <span class="kpi-sub">aucun seuil atteint dans l'horizon de prévision</span>
+            }
+          }
+          <span class="kpi-sub faint">selon « {{ o.best.profile.label }} »</span>
+        </div>
+      }
+
+      <div class="card kpi">
+        <span class="kpi-label"><app-icon name="flame" [size]="15" /> Consommation actuelle</span>
+        <span class="kpi-value">{{ rate().expected | num: 1 }} <small>L/jour</small></span>
+        <span class="kpi-sub">
+          attendue ce mois-ci
+          @if (rate().recent !== null) { · observée {{ rate().recent | num: 1 }} L/j sur {{ rate().recentDays | num }} j }
+        </span>
+      </div>
+
+      <div class="card kpi">
+        <span class="kpi-label"><app-icon name="trend" [size]="15" /> 12 derniers mois</span>
+        @if (yearly(); as y) {
+          <span class="kpi-value">{{ y.liters | liters }}</span>
+          <span class="kpi-sub">
+            ≈ {{ y.cost | euro }}
+            @if (y.coveredDays < 360) { · sur {{ y.coveredDays | num }} j couverts }
+          </span>
+        } @else {
+          <span class="kpi-value faint">—</span>
+          <span class="kpi-sub">pas encore assez de relevés</span>
+        }
+      </div>
+
+      <div class="card kpi">
+        <span class="kpi-label"><app-icon name="euro" [size]="15" /> Prochain plein estimé</span>
+        @if (order(); as o) {
+          <span class="kpi-value">{{ o.best.estimatedCost | euro }}</span>
+          <span class="kpi-sub">{{ o.best.litersToOrder | liters }} à {{ analysis().refills.lastPrice | price }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (hasReadings()) {
+    <div class="card">
+      <div class="card-header chart-header">
+        <h2>Contenu de la cuve</h2>
+        <span class="hint">relevés, pleins et prévisions</span>
+        <span class="spacer"></span>
+        <div class="segmented" aria-label="Historique affiché">
+          @for (o of historyOptions; track o.label) {
+            <button type="button" [class.active]="historyDays() === o.days" (click)="historyDays.set(o.days)">{{ o.label }}</button>
+          }
+        </div>
+        <div class="segmented" aria-label="Horizon de prévision">
+          @for (o of forecastOptions; track o.label) {
+            <button type="button" [class.active]="forecastDays() === o.days" (click)="forecastDays.set(o.days)">+{{ o.label }}</button>
+          }
+        </div>
+      </div>
+      <app-chart [build]="levelChart()" [height]="380" />
+    </div>
+  }
+
+  @if (analysis().tank) {
+    <div class="grid">
+      <div class="card flush">
+        <div class="card-header">
+          <h2>Prévisions par profil</h2>
+          <span class="hint">cliquez pour afficher / masquer la courbe</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Profil</th>
+                <th class="num">Contenu estimé</th>
+                <th class="num">Seuil atteint</th>
+                <th class="num">Commander avant</th>
+                <th class="num">Cuve vide</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of forecastRows(); track row.profile.key) {
+                <tr class="profile-row" [class.disabled]="!row.profile.available" [class.hidden-curve]="!shownProfiles().has(row.profile.key)"
+                  (click)="row.profile.available && toggleProfile(row.profile.key)">
+                  <td>
+                    <div class="profile-name">
+                      <span class="legend-dot" [style.background]="row.color"></span>
+                      <strong>{{ row.profile.label }}</strong>
+                      @if (row.isBest) { <span class="badge success">retenu</span> }
+                    </div>
+                    <div class="small muted profile-note">{{ row.profile.note }}</div>
+                  </td>
+                  @if (row.forecast; as f) {
+                    <td class="num">{{ f.currentLiters | liters }}</td>
+                    <td class="num">{{ f.alertDay | day }}</td>
+                    <td class="num"><strong>{{ f.orderDay | day }}</strong></td>
+                    <td class="num">{{ f.emptyDay | day }}</td>
+                  } @else {
+                    <td colspan="4" class="num faint">
+                      @if (!row.profile.available) { indisponible } @else { relevé nécessaire }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Consommation prévue</h2>
+          <span class="hint">12 prochains mois, selon la saison</span>
+        </div>
+        <app-chart [build]="monthlyChart()" [height]="280" />
+      </div>
+    </div>
+  }
+</div>

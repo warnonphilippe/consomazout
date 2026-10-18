@@ -1,0 +1,52 @@
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.preview.warn {
+  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
+}
+
+.preview-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.preview-liters {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--oil), var(--oil-light));
+}
+
+.list .table-wrap {
+  max-height: calc(100vh - 200px);
+}
+
+.note {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
