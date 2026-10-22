@@ -1,7 +1,7 @@
 import type { ConsumptionAnalysis, TimedRefill } from './consumption';
 import { forEachDaySlice } from './degree-days';
 import type { MonthAverage } from './stats';
-import { daysInMonth, yearMonthOf } from './time';
+import { smoothMonthlyProfile, type DailyProfile } from './smooth';
 
 export type ProfileKey = 'reference' | 'adjusted' | 'history';
 
@@ -108,9 +108,16 @@ export function bestProfile(profiles: ForecastProfile[]): ForecastProfile {
   return profiles[0]!;
 }
 
+const dailyProfiles = new WeakMap<number[], DailyProfile>();
+
+/** Consommation attendue un jour donné : profil mensuel lissé jour par jour (sans cassure au 1er du mois). */
 export function dailyRate(profile: ForecastProfile, day: number): number {
-  const { year, month } = yearMonthOf(day);
-  return (profile.monthly[month] ?? 0) / daysInMonth(year, month);
+  let daily = dailyProfiles.get(profile.monthly);
+  if (!daily) {
+    daily = smoothMonthlyProfile(profile.monthly);
+    dailyProfiles.set(profile.monthly, daily);
+  }
+  return daily(day);
 }
 
 /**

@@ -4,19 +4,20 @@ import { buildDemoData } from './demo-data';
 import { simulate, type ForecastProfile } from './forecast';
 import { toDayNumber } from './time';
 
-const flat = (litersPerMonth: number): ForecastProfile => ({
+/** Profil de consommation constante jour par jour (année non bissextile). */
+const flat = (litersPerDay: number): ForecastProfile => ({
   key: 'reference',
   label: 'test',
-  monthly: Array.from({ length: 12 }, () => litersPerMonth),
+  monthly: [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31].map((days) => days * litersPerDay),
   available: true,
   note: '',
 });
 
 describe('forecast', () => {
   it('date du seuil et date de commande cohérentes avec le profil', () => {
-    // 31 L/mois en janvier = 1 L/jour ; on part de 120 L, seuil 100 L → 20 jours.
+    // 1 L/jour ; on part de 120 L, seuil 100 L → 20 jours.
     const start = toDayNumber('2025-01-01T00:00');
-    const f = simulate(flat(31), {
+    const f = simulate(flat(1), {
       start: { day: start, liters: 120 },
       refillsAfterStart: [],
       now: start,
@@ -35,7 +36,7 @@ describe('forecast', () => {
 
   it('niveau actuel estimé et plein après le dernier relevé', () => {
     const start = toDayNumber('2025-01-01T00:00');
-    const f = simulate(flat(31), {
+    const f = simulate(flat(1), {
       start: { day: start, liters: 200 },
       refillsAfterStart: [
         {

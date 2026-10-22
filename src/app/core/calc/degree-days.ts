@@ -1,4 +1,4 @@
-import { daysInMonth, yearMonthOf } from './time';
+import { smoothMonthlyProfile } from './smooth';
 
 /**
  * Degrés-jours 15/15 normaux à Uccle (IRM), de janvier à décembre.
@@ -15,15 +15,17 @@ export function referenceMonthlyProfile(annualLiters: number, hotWaterLitersPerY
   return UCCLE_DEGREE_DAYS.map((dd) => hotWater / 12 + (heating * dd) / UCCLE_DEGREE_DAYS_YEAR);
 }
 
+/** Degrés-jours normaux jour par jour, lissés (le total de chaque mois reste celui de l'IRM). */
+const dailyDegreeDays = smoothMonthlyProfile(UCCLE_DEGREE_DAYS);
+
 /**
  * Poids saisonnier d'un jour : part de la consommation annuelle attendue ce jour-là
  * (la somme sur une année vaut ~1). Sert à répartir la consommation mesurée entre deux relevés.
+ * Les degrés-jours varient progressivement d'un jour à l'autre : pas de cassure au 1er du mois.
  */
 export function seasonalDayWeight(day: number, hotWaterShare: number): number {
-  const { year, month } = yearMonthOf(day);
   const share = Math.min(Math.max(hotWaterShare, 0), 1);
-  const days = daysInMonth(year, month);
-  return share / 365.25 + ((1 - share) * UCCLE_DEGREE_DAYS[month]!) / (UCCLE_DEGREE_DAYS_YEAR * days);
+  return share / 365.25 + ((1 - share) * dailyDegreeDays(day)) / UCCLE_DEGREE_DAYS_YEAR;
 }
 
 /** Somme des poids saisonniers sur [from, to] (numéros de jour fractionnaires). */

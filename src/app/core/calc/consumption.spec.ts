@@ -73,7 +73,9 @@ describe('consumption', () => {
   it('consommation sur une sous-période', () => {
     const a = analyzeConsumption(tank, [reading('2025-01-01T00:00', 200), reading('2025-01-31T00:00', 140)], [], 0.15);
     const half = consumptionBetween(a, toDayNumber('2025-01-01'), toDayNumber('2025-01-16'));
-    expect(half.liters).toBeCloseTo(300);
+    // Janvier n'est plus uniforme jour par jour (degrés-jours lissés) : proche de la moitié, sans plus.
+    expect(half.liters).toBeGreaterThan(290);
+    expect(half.liters).toBeLessThan(310);
     expect(half.coveredDays).toBeCloseTo(15);
   });
 
