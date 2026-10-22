@@ -1,6 +1,7 @@
 import { fr } from 'date-fns/locale';
 import type { ChartConfiguration, ChartDataset, TooltipItem } from 'chart.js';
 import type { FullAnalysis } from '../../core/calc/analysis';
+import { levelSeries } from '../../core/calc/consumption';
 import type { ProfileKey } from '../../core/calc/forecast';
 import { dateToDayNumber, dayNumberToDate, MONTH_SHORT, toDayNumber, yearMonthOf } from '../../core/calc/time';
 import type { Refill } from '../../core/models/app-data.model';
@@ -37,25 +38,45 @@ export function levelChart(
     const maxDay = now + options.forecastDays;
     const datasets: ChartDataset<'line' | 'scatter', XY[]>[] = [];
 
+    // Contenu reconstitué : diminution selon la consommation, saut vertical à chaque livraison.
+    const series = analysis.consumption ? levelSeries(analysis.consumption) : { points: [], refills: [] };
     datasets.push({
       type: 'line',
-      label: 'Contenu relevé',
-      data: levels.map((l) => ({ x: ms(l.day), y: Math.round(l.liters) })),
+      label: 'Contenu de la cuve',
+      data: series.points.map((p) => ({ x: ms(p.day), y: Math.round(p.liters) })),
       borderColor: c.real,
       backgroundColor: alpha(c.real, 0.12),
       fill: 'origin',
       borderWidth: 2,
-      pointRadius: levels.length > 120 ? 0 : 2.5,
-      pointHoverRadius: 5,
+      pointRadius: 0,
+      pointHoverRadius: 0,
       tension: 0,
+      order: 2,
+    });
+    datasets.push({
+      type: 'scatter',
+      label: 'Relevés',
+      data: levels.map((l) => ({ x: ms(l.day), y: Math.round(l.liters) })),
+      pointRadius: levels.length > 120 ? 2 : 3.5,
+      pointHoverRadius: 6,
+      backgroundColor: c.real,
+      borderColor: c.surface,
+      borderWidth: 1,
       order: 1,
     });
 
-    // Pleins : marqueurs placés au niveau du premier relevé qui suit la livraison.
-    const refillPoints: XY[] = refills.map((refill) => {
+    // Pleins : marqueur au niveau atteint juste après la livraison.
+    const marked = new Map(series.refills.map((m) => [m.refill.id, m.liters]));
+    const lastReading = levels.at(-1);
+    const refillPoints: XY[] = refills.flatMap((refill) => {
       const day = toDayNumber(refill.date);
-      const after = levels.find((l) => l.day >= day);
-      return { x: ms(day), y: Math.round(after?.liters ?? levels.at(-1)?.liters ?? refill.liters), refill };
+      let y = marked.get(refill.id);
+      if (y === undefined && lastReading && day > lastReading.day) {
+        // Livraison postérieure au dernier relevé : niveau tiré de la prévision retenue.
+        const atDay = analysis.best?.points.filter((p) => Math.abs(p.day - day) < 1e-6) ?? [];
+        y = atDay.length > 0 ? Math.max(...atDay.map((p) => p.liters)) : undefined;
+      }
+      return y === undefined ? [] : [{ x: ms(day), y: Math.round(y), refill }];
     });
     datasets.push({
       type: 'scatter',

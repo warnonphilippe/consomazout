@@ -156,8 +156,9 @@ En haut de la page, les indicateurs résument le nombre de livraisons, la dépen
 
 ### Graphique « Contenu de la cuve »
 
-- **Ligne bleue pleine** : contenu calculé à chaque relevé.
-- **Triangles** : les pleins. Survolez-en un pour voir les litres et le prix.
+- **Ligne bleue pleine** : contenu de la cuve reconstitué jour par jour. Entre deux relevés, il diminue selon la consommation, plus vite en hiver qu'en été. À chaque livraison, il monte d'un coup de la quantité livrée.
+- **Points bleus** : les relevés. La courbe passe exactement par chacun d'eux.
+- **Triangles** : les pleins, placés au niveau atteint juste après la livraison. Survolez-en un pour voir les litres et le prix.
 - **Lignes pointillées** : les prévisions, une par profil (voir ci-dessous).
 - **Ligne rouge** : le seuil d'alerte. **Ligne grise pointillée** : le remplissage maximal.
 - **Trait vertical** : aujourd'hui.

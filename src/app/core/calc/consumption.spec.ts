@@ -1,5 +1,5 @@
 import { DEFAULT_TANK, type Reading, type Refill, type Tank } from '../models/app-data.model';
-import { analyzeConsumption, consumptionBetween } from './consumption';
+import { analyzeConsumption, consumptionBetween, levelSeries, type LevelPoint } from './consumption';
 import { toDayNumber } from './time';
 
 // Cuve rectangulaire de 100 x 100 cm : 10 L par cm de hauteur.
@@ -103,5 +103,70 @@ describe('consumption', () => {
     );
     expect(a.levels).toHaveLength(2);
     expect(a.intervals[0]!.consumed).toBeCloseTo(500);
+  });
+
+  /** Vérifie qu'entre deux points le niveau ne monte que lors d'une livraison (saut vertical). */
+  const onlyRisesAtRefills = (points: LevelPoint[], refillDays: number[]): boolean =>
+    points.every((p, i) => {
+      const prev = points[i - 1];
+      return !prev || p.liters <= prev.liters + 1e-6 || (p.day === prev.day && refillDays.includes(p.day));
+    });
+
+  it('courbe : diminution régulière puis saut vertical à la livraison', () => {
+    const a = analyzeConsumption(
+      tank,
+      [reading('2025-01-01T09:00', 50), reading('2025-01-21T09:00', 150)],
+      [refill('2025-01-10T09:00', 1300)],
+      0.15,
+    );
+    const { points, refills } = levelSeries(a);
+    const refillDay = toDayNumber('2025-01-10T09:00');
+    expect(points[0]).toEqual({ day: toDayNumber('2025-01-01T09:00'), liters: 500 });
+    expect(points.at(-1)!.liters).toBeCloseTo(1500, 6);
+    expect(onlyRisesAtRefills(points, [refillDay])).toBe(true);
+    const jump = points.findIndex((p, i) => i > 0 && p.liters > points[i - 1]!.liters);
+    expect(points[jump]!.day).toBe(refillDay);
+    expect(points[jump]!.liters - points[jump - 1]!.liters).toBeCloseTo(1300, 6);
+    expect(refills[0]!.liters).toBeCloseTo(points[jump]!.liters, 6);
+  });
+
+  it('la cuve ne descend jamais sous zéro avant une livraison', () => {
+    // 1 000 L au départ, 2 000 L livrés en septembre, 1 100 L à l'arrivée : la répartition purement
+    // saisonnière viderait la cuve avant la livraison ; elle est ajustée pour rester ≥ 0.
+    const a = analyzeConsumption(
+      tank,
+      [reading('2024-10-01T09:00', 100), reading('2026-03-01T09:00', 110)],
+      [refill('2025-09-15T09:00', 2000)],
+      0.15,
+    );
+    const { points } = levelSeries(a);
+    expect(Math.min(...points.map((p) => p.liters))).toBeGreaterThanOrEqual(0);
+    expect(points.at(-1)!.liters).toBeCloseTo(1100, 6);
+    expect(a.intervals[0]!.segments.reduce((s, seg) => s + seg.liters, 0)).toBeCloseTo(1900, 6);
+    expect(a.months.reduce((s, m) => s + m.liters, 0)).toBeCloseTo(1900, 6);
+  });
+
+  it('données réelles : cylindre couché Ø150 × 170 cm, relevés espacés et trois livraisons', () => {
+    const real: Tank = { ...DEFAULT_TANK, shape: 'horizontalCylinder', diameterCm: 150, lengthCm: 170 };
+    const readings = [
+      reading('2024-05-25T21:18', 30),
+      reading('2024-10-29T21:16', 64),
+      reading('2026-03-03T21:14', 63),
+      reading('2026-03-09T21:11', 61),
+      reading('2026-09-30T21:11', 65),
+    ];
+    const deliveries = [refill('2024-05-31T21:19', 1000), refill('2025-09-15T21:15', 2000), refill('2026-03-15T21:12', 1000)];
+    const a = analyzeConsumption(real, readings, deliveries, 0.15);
+    const { points, refills } = levelSeries(a);
+    const refillDays = deliveries.map((r) => toDayNumber(r.date));
+    expect(onlyRisesAtRefills(points, refillDays)).toBe(true);
+    expect(refills).toHaveLength(3);
+    expect(Math.min(...points.map((p) => p.liters))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...points.map((p) => p.liters))).toBeLessThanOrEqual(3004.2);
+    // Chaque relevé est bien un point de la courbe.
+    for (const level of a.levels) {
+      const atDay = points.filter((p) => Math.abs(p.day - level.day) < 1e-6);
+      expect(atDay.some((p) => Math.abs(p.liters - level.liters) < 0.5)).toBe(true);
+    }
   });
 });
