@@ -1,14 +1,55 @@
 import { fr } from 'date-fns/locale';
-import type { ChartConfiguration, ChartDataset, TooltipItem } from 'chart.js';
+import { Interaction, type ActiveElement, type ChartConfiguration, type ChartDataset, type InteractionModeFunction, type TooltipItem } from 'chart.js';
+import { getRelativePosition } from 'chart.js/helpers';
 import type { FullAnalysis } from '../../core/calc/analysis';
 import { levelSeries } from '../../core/calc/consumption';
+import { heightForVolume, supportsHeight } from '../../core/calc/tank-volume';
 import type { ProfileKey } from '../../core/calc/forecast';
 import { dateToDayNumber, dayNumberToDate, MONTH_SHORT, toDayNumber, yearMonthOf } from '../../core/calc/time';
 import type { Refill } from '../../core/models/app-data.model';
 import { alpha, chartLegend, type ChartColors } from '../../shared/chart/chart-colors';
 import { fmt } from '../../shared/format';
 
-type XY = { x: number; y: number; refill?: Refill };
+/** `heightCm` : hauteur réellement mesurée (relevé encodé en cm). */
+type XY = { x: number; y: number; refill?: Refill; heightCm?: number };
+
+const TODAY_LABEL = "Aujourd'hui";
+
+declare module 'chart.js' {
+  interface InteractionModeMap {
+    markersFirst: InteractionModeFunction;
+  }
+}
+
+/** Rayon (px) dans lequel un marqueur (relevé, plein) l'emporte sur la courbe. */
+const MARKER_HIT_RADIUS = 12;
+
+/**
+ * Survol : un marqueur (relevé ou plein, jeux de type « scatter ») proche du pointeur est prioritaire ;
+ * sinon, le point le plus proche horizontalement. Sans cela, la courbe journalière, plus dense,
+ * masquerait les informations du plein.
+ */
+Interaction.modes.markersFirst = (chart, event, options, useFinalPosition) => {
+  const position = getRelativePosition(event, chart);
+  const markers: (ActiveElement & { distance: number })[] = [];
+  chart.data.datasets.forEach((dataset, datasetIndex) => {
+    if (dataset.type !== 'scatter' || !chart.isDatasetVisible(datasetIndex)) {
+      return;
+    }
+    chart.getDatasetMeta(datasetIndex).data.forEach((element, index) => {
+      const { x, y } = element.getProps(['x', 'y'], useFinalPosition);
+      const distance = Math.hypot(x - position.x, y - position.y);
+      if (distance <= MARKER_HIT_RADIUS) {
+        markers.push({ element, datasetIndex, index, distance });
+      }
+    });
+  });
+  if (markers.length > 0) {
+    const closest = Math.min(...markers.map((m) => m.distance));
+    return markers.filter((m) => m.distance === closest);
+  }
+  return Interaction.modes.nearest(chart, event, { ...options, axis: 'x', intersect: false }, useFinalPosition);
+};
 
 export const PROFILE_COLOR: Record<ProfileKey, keyof ChartColors> = {
   reference: 'reference',
@@ -56,7 +97,11 @@ export function levelChart(
     datasets.push({
       type: 'scatter',
       label: 'Relevés',
-      data: levels.map((l) => ({ x: ms(l.day), y: Math.round(l.liters) })),
+      data: levels.map((l) => ({
+        x: ms(l.day),
+        y: Math.round(l.liters),
+        ...(l.reading.heightCm !== null ? { heightCm: l.reading.heightCm } : {}),
+      })),
       pointRadius: levels.length > 120 ? 2 : 3.5,
       pointHoverRadius: 6,
       backgroundColor: c.real,
@@ -119,7 +164,7 @@ export function levelChart(
     }
     datasets.push({
       type: 'line',
-      label: "Aujourd'hui",
+      label: TODAY_LABEL,
       data: [
         { x: ms(now), y: 0 },
         { x: ms(now), y: Math.round(analysis.capacity) },
@@ -138,18 +183,25 @@ export function levelChart(
         maintainAspectRatio: false,
         animation: false,
         parsing: false,
-        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+        interaction: { mode: 'markersFirst', intersect: false },
         plugins: {
           legend: chartLegend(c),
           tooltip: {
+            filter: (item: TooltipItem<'line'>) => item.dataset.label !== TODAY_LABEL,
             callbacks: {
               title: (items: TooltipItem<'line'>[]) => (items[0] ? fmt.longDate(dateToDayNumber(new Date(items[0].parsed.x ?? 0))) : ''),
               label: (item: TooltipItem<'line'>) => {
                 const raw = item.raw as XY;
+                const content = withHeight(analysis, item.parsed.y ?? 0, raw.heightCm);
                 if (raw.refill) {
-                  return ` Plein : ${fmt.liters(raw.refill.liters)} à ${fmt.price(raw.refill.pricePerLiter)} (${fmt.euro(raw.refill.totalPrice)})`;
+                  return [
+                    raw.refill.pricePerLiter > 0
+                      ? ` Plein : ${fmt.liters(raw.refill.liters)} à ${fmt.price(raw.refill.pricePerLiter)} (${fmt.euro(raw.refill.totalPrice)})`
+                      : ` Plein : ${fmt.liters(raw.refill.liters)} (prix non encodé)`,
+                    ` Après livraison : ${content}`,
+                  ];
                 }
-                return ` ${item.dataset.label} : ${fmt.liters(item.parsed.y)}`;
+                return ` ${item.dataset.label} : ${content}`;
               },
             },
           },
@@ -210,6 +262,21 @@ export function monthlyForecastChart(analysis: FullAnalysis, now: number): (c: C
       },
     };
   };
+}
+
+/**
+ * « 1 248 L · 65,0 cm » : hauteur mesurée si connue, sinon hauteur correspondant au volume
+ * (« ≈ »), calculée selon la cuve. Rien pour une cuve à jauge, qui n'a pas de dimensions.
+ */
+function withHeight(analysis: FullAnalysis, liters: number, measuredCm?: number): string {
+  const tank = analysis.tank;
+  if (measuredCm !== undefined) {
+    return `${fmt.liters(liters)} · ${fmt.number(measuredCm, 1)} cm`;
+  }
+  if (!tank || !supportsHeight(tank)) {
+    return fmt.liters(liters);
+  }
+  return `${fmt.liters(liters)} · ≈ ${fmt.number(heightForVolume(tank, liters), 1)} cm`;
 }
 
 function horizontal(label: string, y: number, from: number, to: number, color: string, dash: number[]): ChartDataset<'line', XY[]> {
