@@ -21,9 +21,10 @@
     "start:prod": "npm run build && electron .",
     "dist:mac": "npm run build && electron-builder --mac --arm64",
     "dist:win": "npm run build && electron-builder --win --x64 --publish never",
-    "test": "ng test --watch=false",
+    "test": "ng test --watch=false && npm run test:electron",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "video": "npm run build && node scripts/video/record-demo.mjs"
+    "video": "npm run build && node scripts/video/record-demo.mjs",
+    "test:electron": "vitest run --config vitest.electron.config.ts"
   },
   "devDependencies": {
     "@angular/build": "^21.2.27",
@@ -53,5 +54,8 @@
   },
   "engines": {
     "node": ">=22.12"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.137.0"
   }
 }

@@ -1,4 +1,4 @@
-<div class="shell">
+<div class="shell" [class.with-panel]="ai.open()">
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-logo">
@@ -33,6 +33,10 @@
         </div>
       </a>
     }
+
+    <button type="button" class="btn assistant-btn" [class.active]="ai.open()" (click)="ai.open.set(!ai.open())">
+      <app-icon name="sparkles" [size]="16" /> Assistant IA
+    </button>
 
     <div class="spacer"></div>
 
@@ -76,6 +80,10 @@
       <router-outlet />
     }
   </main>
+
+  @if (ai.open()) {
+    <app-assistant-panel class="assistant" />
+  }
 </div>
 
 <div class="toasts" aria-live="polite">

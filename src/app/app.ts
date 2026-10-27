@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, viewChild } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AiService } from './core/ai/ai.service';
 import { ConfirmService } from './core/services/confirm.service';
 import { DataStore } from './core/services/data-store.service';
 import { ThemeService } from './core/services/theme.service';
@@ -8,6 +9,7 @@ import type { ThemeMode } from './core/models/app-data.model';
 import { fmt } from './shared/format';
 import { IconComponent, type IconName } from './shared/icon.component';
 import { TankGaugeComponent } from './shared/tank-gauge.component';
+import { AssistantPanelComponent } from './shared/assistant/assistant-panel.component';
 
 interface NavItem {
   readonly path: string;
@@ -18,7 +20,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent, TankGaugeComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent, TankGaugeComponent, AssistantPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.css',
@@ -28,6 +30,7 @@ export class App {
   protected readonly theme = inject(ThemeService);
   protected readonly toasts = inject(ToastService);
   protected readonly confirm = inject(ConfirmService);
+  protected readonly ai = inject(AiService);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmDialog');
 
   protected readonly nav: NavItem[] = [

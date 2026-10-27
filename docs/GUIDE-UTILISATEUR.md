@@ -235,6 +235,36 @@ Le **seuil d'alerte** et le **délai de commande** sont décrits dans la section
 
 Choisissez **Clair**, **Sombre** ou **Système**. Le mode Système suit le réglage de macOS ou de Windows. Le choix est aussi disponible en bas de la barre latérale.
 
+## Assistant IA (Claude)
+
+L'assistant répond à vos questions sur la cuve en s'appuyant sur **toutes vos données** : description de la cuve, relevés, pleins et prix, consommation mois par mois, niveau reconstitué, statistiques, prévisions des trois profils et réglages. Par exemple : « Quand dois-je commander le prochain plein, et combien ? », « Ma consommation est-elle normale ? », « Y a-t-il des relevés suspects ? ».
+
+### Mise en route
+
+1. Créez une clé API sur [console.anthropic.com](https://console.anthropic.com) (compte Anthropic, avec un moyen de paiement : les appels sont facturés selon l'usage).
+2. Dans **Réglages → Assistant IA (Claude)**, collez la clé et cliquez sur **Enregistrer**.
+3. Choisissez le **modèle** :
+   - Claude Opus 5.5, par défaut : le plus précis ;
+   - Claude Sonnet 5.5 : équilibré ;
+   - Claude Haiku 5.5 : rapide et économique ;
+   - Claude Fable 5.1 : le plus capable, mais plus coûteux.
+4. Cliquez sur **Tester la connexion**. Ce test vérifie la clé et le modèle sans rien générer, donc sans frais.
+
+### Utilisation
+
+Cliquez sur **Assistant IA** dans la barre latérale : le panneau s'ouvre à droite.
+- Posez une question, ou choisissez une des suggestions. La réponse s'affiche au fur et à mesure.
+- **Entrée** envoie la question. **Maj + Entrée** passe à la ligne.
+- **Arrêter** interrompt la réponse en cours. L'icône de rafraîchissement démarre une nouvelle conversation.
+
+L'assistant connaît vos données telles qu'elles sont au moment de la question. Si vous encodez un relevé pendant la conversation, il en tient compte à la question suivante.
+
+### Sécurité et confidentialité
+
+- La clé est **chiffrée par le système** : Trousseau macOS sur Mac, chiffrement de Windows sur PC. Elle est rangée dans un fichier séparé des données. Elle n'est jamais affichée, exportée ni incluse dans le fichier d'échange JSON : sur un autre ordinateur, encodez-la à nouveau.
+- Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question.
+- Les réponses sont des analyses à partir de vos données, pas des certitudes. Elles sont d'autant plus fiables que les relevés sont fréquents.
+
 ## Sauvegarde et données
 
 Les données sont **enregistrées automatiquement** à chaque modification. Le point vert en bas de la barre latérale le confirme. Elles sont stockées dans un fichier JSON :

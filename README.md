@@ -8,6 +8,7 @@ Application de bureau (**Angular 21 + Electron**) pour suivre la consommation de
 - **Statistiques** par mois, par saison et par année, avec comparaison à une référence belge.
 - **Prévisions** selon la saison : statistique belge, statistique recalée sur la consommation observée, historique réel de la maison. L'application en déduit la date de commande conseillée.
 - **Plusieurs ordinateurs** : export JSON, puis import qui fusionne. Seuls les relevés et pleins absents sont ajoutés ; rien n'est modifié ni supprimé.
+- **Assistant IA (Claude)** : questions en langage naturel sur toutes les données. La clé API est chiffrée par le système et n'est utilisée que dans le process principal.
 - Thèmes **clair / sombre / système**, interface en CSS natif, sans bibliothèque de composants.
 
 Le mode d'emploi complet est dans **[docs/GUIDE-UTILISATEUR.md](docs/GUIDE-UTILISATEUR.md)**. Il est aussi lisible dans l'application, page *Aide*.
@@ -22,7 +23,7 @@ Il faut Node.js 22.12 ou plus récent.
 npm install
 npm run dev          # Angular (http://localhost:4200) + Electron avec rechargement
 npm run start:prod   # build de production puis lancement d'Electron
-npm test             # tests unitaires (Vitest)
+npm test             # tests unitaires (Vitest) : interface puis process principal (npm run test:electron)
 ```
 
 `npm run dev:ng` lance seulement l'interface dans un navigateur. Sans Electron, les données sont alors conservées dans le `localStorage` du navigateur.
@@ -68,6 +69,8 @@ electron/                  Process principal (TypeScript → dist-electron/)
   main.ts                  fenêtre durcie, protocole app://, IPC, thème natif
   preload.ts               pont contextBridge → window.consoMazout
   storage.ts               fichier JSON (écriture atomique + copie .bak)
+  ai.ts                    assistant Claude (SDK officiel @anthropic-ai/sdk) : réponses en flux, repli serveur, erreurs typées
+  secrets.ts               clé API chiffrée par safeStorage (Trousseau macOS / DPAPI Windows)
   shared/ipc-contract.ts   types partagés avec l'interface
 src/app/
   core/models/             modèle de données, validation et fusion des fichiers importés (merge.ts)
@@ -78,6 +81,7 @@ src/app/
     stats.ts                 tableaux mensuels, moyennes, saisons, prix
     forecast.ts              profils de prévision et simulation jour par jour
     analysis.ts              assemblage complet utilisé par l'interface
+  core/ai/                 contexte envoyé à Claude (instantané de toutes les données) et conversation
   core/services/           DataStore (signals + sauvegarde auto), stockage, thème, toasts
   shared/                  icônes SVG, jauge de cuve, enveloppe Chart.js, formats fr-BE
   pages/                   tableau de bord, relevés, pleins, statistiques, cuve, réglages, aide

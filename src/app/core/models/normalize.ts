@@ -1,4 +1,5 @@
 import {
+  AI_MODELS,
   DEFAULT_SETTINGS,
   DEFAULT_TANK,
   emptyData,
@@ -106,6 +107,7 @@ function normalizeSettings(raw: Raw): Settings {
     alertThresholdPct: num(raw['alertThresholdPct'], DEFAULT_SETTINGS.alertThresholdPct),
     orderLeadDays: num(raw['orderLeadDays'], DEFAULT_SETTINGS.orderLeadDays),
     theme: theme === 'light' || theme === 'dark' || theme === 'system' ? theme : DEFAULT_SETTINGS.theme,
+    aiModel: AI_MODELS.some((m) => m.id === raw['aiModel']) ? (raw['aiModel'] as string) : DEFAULT_SETTINGS.aiModel,
   };
 }
 

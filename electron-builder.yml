@@ -9,8 +9,8 @@ directories:
   output: release
   buildResources: build
 
-# esbuild embarque déjà tout le front dans dist/ ; le process principal n'a aucune dépendance
-# (Angular, Chart.js… sont en devDependencies et ne sont donc pas empaquetés).
+# esbuild embarque déjà tout le front dans dist/ ; seule la dépendance du process principal
+# (@anthropic-ai/sdk) est empaquetée. Angular, Chart.js… sont en devDependencies.
 files:
   - dist/consomazout/browser/**/*
   - dist-electron/**/*.js
@@ -25,8 +25,9 @@ mac:
       arch: [arm64]
   category: public.app-category.lifestyle
   icon: build/icon.icns
-  # Pas de compte Apple Developer : signature ad hoc, indispensable pour qu'une
-  # app arm64 se lance. Sur un autre Mac, lever la quarantaine (voir le guide).
+  # Par défaut : signature ad hoc, indispensable pour qu'une app arm64 se lance. Sur un autre Mac, lever la
+  # quarantaine (voir le guide). release/build.sh signe plutôt avec le certificat « Apple Development » du
+  # trousseau quand il existe : une identité stable garde l'accès au Trousseau (clé API) d'une version à l'autre.
   identity: '-'
   hardenedRuntime: false
 

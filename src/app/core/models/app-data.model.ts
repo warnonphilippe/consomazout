@@ -92,6 +92,8 @@ export interface Settings {
   /** Délai entre la commande et la livraison, en jours. */
   orderLeadDays: number;
   theme: ThemeMode;
+  /** Modèle Claude utilisé par l'assistant IA. */
+  aiModel: string;
 }
 
 export interface AppData {
@@ -115,7 +117,16 @@ export const DEFAULT_SETTINGS: Settings = {
   alertThresholdPct: 20,
   orderLeadDays: 14,
   theme: 'system',
+  aiModel: 'claude-opus-5-5',
 };
+
+/** Modèles proposés pour l'assistant (identifiants exacts de l'API Claude). */
+export const AI_MODELS: readonly { id: string; label: string }[] = [
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (le plus précis)' },
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (équilibré)' },
+  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (rapide, économique)' },
+  { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (le plus capable, plus coûteux)' },
+];
 
 export const DEFAULT_TANK: Tank = {
   name: 'Cuve principale',

@@ -4,6 +4,25 @@
   height: 100vh;
 }
 
+.shell.with-panel {
+  grid-template-columns: 236px minmax(0, 1fr) minmax(340px, 420px);
+}
+
+.assistant {
+  min-height: 0;
+}
+
+.assistant-btn {
+  justify-content: center;
+  color: var(--violet-text);
+  background: var(--violet-soft);
+  border-color: transparent;
+}
+
+.assistant-btn.active {
+  border-color: var(--violet);
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -206,4 +225,9 @@
     transform: none;
     opacity: 1;
   }
+}
+
+/* Notifications : à gauche du panneau de l'assistant quand il est ouvert. */
+.shell.with-panel ~ .toasts {
+  right: 440px;
 }

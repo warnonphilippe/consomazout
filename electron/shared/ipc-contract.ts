@@ -16,6 +16,37 @@ export interface LoadResult {
   readonly recoveredFromBackup: boolean;
 }
 
+export interface AiStatus {
+  /** Une clé API est enregistrée (elle n'est jamais renvoyée à la page). */
+  readonly hasKey: boolean;
+  /** Le chiffrement du système (Trousseau macOS, DPAPI Windows) est disponible pour la conserver. */
+  readonly encryptionAvailable: boolean;
+}
+
+export interface AiMessage {
+  readonly role: 'user' | 'assistant';
+  readonly content: string;
+}
+
+export interface AiChatRequest {
+  /** Identifiant choisi par la page pour rattacher les événements du flux à la conversation. */
+  readonly requestId: string;
+  readonly model: string;
+  /** Contexte : rôle de l'assistant et instantané de toutes les données de l'application. */
+  readonly system: string;
+  readonly messages: readonly AiMessage[];
+}
+
+export type AiStreamEvent =
+  | { readonly requestId: string; readonly type: 'delta'; readonly text: string }
+  | { readonly requestId: string; readonly type: 'done' }
+  | { readonly requestId: string; readonly type: 'error'; readonly message: string };
+
+export interface AiTestResult {
+  readonly ok: boolean;
+  readonly message: string;
+}
+
 export interface ConsoMazoutApi {
   readonly platform: string;
   readonly data: {
@@ -31,6 +62,17 @@ export interface ConsoMazoutApi {
   readonly theme: {
     set(mode: ThemeMode): Promise<void>;
   };
+  readonly ai: {
+    status(): Promise<AiStatus>;
+    /** Enregistre (chiffrée) ou efface (`null`) la clé API. */
+    setKey(key: string | null): Promise<AiStatus>;
+    /** Vérifie la clé et le modèle sans générer de texte. */
+    test(model: string): Promise<AiTestResult>;
+    /** Lance une réponse en flux ; les morceaux arrivent par `onEvent`, la promesse se termine avec le flux. */
+    chat(request: AiChatRequest): Promise<void>;
+    abort(requestId: string): Promise<void>;
+    onEvent(listener: (event: AiStreamEvent) => void): () => void;
+  };
 }
 
 export const IPC = {
@@ -40,4 +82,10 @@ export const IPC = {
   importFile: 'data:import',
   reveal: 'data:reveal',
   theme: 'theme:set',
+  aiStatus: 'ai:status',
+  aiSetKey: 'ai:setKey',
+  aiTest: 'ai:test',
+  aiChat: 'ai:chat',
+  aiAbort: 'ai:abort',
+  aiEvent: 'ai:event',
 } as const;

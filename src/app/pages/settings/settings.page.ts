@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, injec
 import { monthlyCsv, readingsCsv, refillsCsv } from '../../core/calc/csv';
 import { UCCLE_DEGREE_DAYS } from '../../core/calc/degree-days';
 import { MONTH_SHORT } from '../../core/calc/time';
-import { REFERENCE_PRESETS, type AppData, type ReferencePreset, type ThemeMode } from '../../core/models/app-data.model';
+import { AiService } from '../../core/ai/ai.service';
+import { AI_MODELS, REFERENCE_PRESETS, type AppData, type ReferencePreset, type ThemeMode } from '../../core/models/app-data.model';
 import type { MergeReport } from '../../core/models/merge';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { DataStore } from '../../core/services/data-store.service';
@@ -34,6 +35,12 @@ export default class SettingsPage {
     key,
     ...REFERENCE_PRESETS[key],
   }));
+
+  protected readonly ai = inject(AiService);
+  protected readonly models = AI_MODELS;
+  protected readonly keyDraft = signal('');
+  protected readonly keyBusy = signal(false);
+  protected readonly testResult = signal<{ ok: boolean; message: string } | null>(null);
 
   protected readonly themeModes: { mode: ThemeMode; icon: IconName; label: string }[] = [
     { mode: 'light', icon: 'sun', label: 'Clair' },
@@ -68,6 +75,55 @@ export default class SettingsPage {
         dialog.close();
       }
     });
+  }
+
+  protected async saveKey(): Promise<void> {
+    const key = this.keyDraft().trim();
+    if (key === '' || this.keyBusy()) {
+      return;
+    }
+    this.keyBusy.set(true);
+    try {
+      await this.ai.setKey(key);
+      this.keyDraft.set('');
+      this.testResult.set(null);
+      this.toast.show('Clé API enregistrée, chiffrée par le système.');
+    } catch (error) {
+      this.toast.show(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      this.keyBusy.set(false);
+    }
+  }
+
+  protected async removeKey(): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: 'Supprimer la clé API ?',
+      message: 'L’assistant IA sera désactivé jusqu’à ce que vous enregistriez une nouvelle clé.',
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (ok) {
+      await this.ai.clearKey();
+      this.testResult.set(null);
+      this.toast.show('Clé API supprimée.');
+    }
+  }
+
+  protected async testKey(): Promise<void> {
+    this.keyBusy.set(true);
+    this.testResult.set(null);
+    try {
+      this.testResult.set(await this.ai.test());
+    } catch (error) {
+      this.testResult.set({ ok: false, message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      this.keyBusy.set(false);
+    }
+  }
+
+  protected setModel(event: Event): void {
+    this.store.updateSettings({ aiModel: (event.target as HTMLSelectElement).value });
+    this.testResult.set(null);
   }
 
   protected selectPreset(key: Exclude<ReferencePreset, 'custom'>): void {

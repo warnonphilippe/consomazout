@@ -932,3 +932,17 @@ dialog.modal .modal-foot {
   border-top: 1px solid var(--border);
   margin: 24px 0;
 }
+
+/* Réponses de l'assistant : titres Markdown compacts dans les bulles. */
+app-assistant-panel .bubble.md :is(h1, h2, h3, h4) {
+  margin: 8px 0 6px;
+  padding-top: 0;
+  border-top: none;
+  font-size: 15px;
+}
+app-assistant-panel .bubble.md > :first-child {
+  margin-top: 0;
+}
+app-assistant-panel .bubble.md > :last-child {
+  margin-bottom: 0;
+}

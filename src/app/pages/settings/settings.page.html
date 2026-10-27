@@ -97,6 +97,77 @@
     </div>
   </div>
 
+  <div class="section" id="ia"><span class="pill violet"><app-icon name="sparkles" [size]="13" /> Assistant IA (Claude)</span></div>
+  <div class="card form">
+    @if (!ai.available) {
+      <div class="callout">
+        <app-icon name="info" />
+        <div>L'assistant IA fonctionne dans l'application de bureau.</div>
+      </div>
+    } @else {
+      <p class="muted small">
+        Avec une clé API Anthropic (console.anthropic.com), l'assistant analyse toutes vos données : cuve, relevés,
+        pleins, statistiques, prévisions et réglages. La clé est chiffrée par le système (Trousseau macOS) et n'est
+        jamais exportée ni affichée. Les appels sont facturés par Anthropic selon votre usage.
+      </p>
+      <div class="key-status">
+        @if (ai.hasKey()) {
+          <span class="badge success"><app-icon name="check" [size]="12" /> Clé enregistrée</span>
+        } @else {
+          <span class="badge warning"><app-icon name="key" [size]="12" /> Aucune clé</span>
+        }
+      </div>
+      @if (!ai.status().encryptionAvailable) {
+        <div class="callout warning small">
+          <app-icon name="alert" [size]="16" />
+          <div>Le chiffrement du système n'est pas disponible : la clé ne peut pas être enregistrée en sécurité.</div>
+        </div>
+      }
+      <div class="key-row">
+        <input
+          class="input"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="sk-ant-…"
+          aria-label="Clé API Anthropic"
+          [value]="keyDraft()"
+          (input)="keyDraft.set($any($event.target).value)"
+          (keydown.enter)="saveKey()"
+        />
+        <button type="button" class="btn primary" [disabled]="keyBusy() || keyDraft().trim() === ''" (click)="saveKey()">
+          <app-icon name="key" [size]="15" /> {{ ai.hasKey() ? 'Remplacer' : 'Enregistrer' }}
+        </button>
+      </div>
+      <div class="form-grid">
+        <div class="field model-field">
+          <label for="model">Modèle</label>
+          <select id="model" class="select" [value]="settings().aiModel" (change)="setModel($event)">
+            @for (m of models; track m.id) {
+              <option [value]="m.id" [selected]="m.id === settings().aiModel">{{ m.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="btn" [disabled]="keyBusy() || !ai.hasKey()" (click)="testKey()">
+          <app-icon name="refresh" [size]="15" /> Tester la connexion
+        </button>
+        @if (ai.hasKey()) {
+          <button type="button" class="btn danger" (click)="removeKey()">
+            <app-icon name="trash" [size]="15" /> Supprimer la clé
+          </button>
+        }
+      </div>
+      @if (testResult(); as r) {
+        <div class="callout" [class.success]="r.ok" [class.danger]="!r.ok">
+          <app-icon [name]="r.ok ? 'check' : 'alert'" />
+          <div>{{ r.message }}</div>
+        </div>
+      }
+    }
+  </div>
+
   <div class="section"><span class="pill cyan"><app-icon name="file" [size]="13" /> Données</span></div>
   <div class="grid grid-2">
     <div class="card form">

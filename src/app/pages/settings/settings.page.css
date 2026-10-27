@@ -145,3 +145,18 @@
 .danger-text {
   color: var(--danger-text);
 }
+
+.key-row {
+  display: flex;
+  gap: 8px;
+}
+
+.key-row .input {
+  flex: 1;
+  font-family: var(--mono);
+}
+
+.model-field {
+  grid-column: 1 / -1;
+  max-width: 420px;
+}

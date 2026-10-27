@@ -1,0 +1,91 @@
+<div class="head">
+  <div class="title"><app-icon name="sparkles" [size]="17" /> Assistant IA</div>
+  <div class="row">
+    <button
+      type="button"
+      class="icon-btn"
+      title="Nouvelle conversation"
+      aria-label="Nouvelle conversation"
+      [disabled]="ai.messages().length === 0"
+      (click)="ai.newConversation()"
+    >
+      <app-icon name="refresh" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Fermer"
+      aria-label="Fermer"
+      (click)="ai.open.set(false)"
+    >
+      <app-icon name="x" [size]="16" />
+    </button>
+  </div>
+</div>
+
+@if (!ai.available) {
+  <div class="notice">
+    <app-icon name="info" />
+    <p>
+      L'assistant fonctionne dans l'application de bureau ConsoMazout : la clé API y est conservée de
+      façon chiffrée et n'est jamais exposée à la page.
+    </p>
+  </div>
+} @else if (!ai.hasKey()) {
+  <div class="notice">
+    <app-icon name="key" />
+    <p>Ajoutez votre clé API Claude pour activer l'assistant.</p>
+    <a class="btn primary sm" routerLink="/reglages" fragment="ia">Ouvrir les réglages</a>
+  </div>
+} @else {
+  <div class="messages" #list aria-live="polite">
+    @if (rendered().length === 0) {
+      <div class="intro">
+        <p>
+          Posez une question sur votre cuve, votre consommation, vos livraisons ou vos prévisions.
+          L'assistant voit <strong>toutes vos données</strong> (cuve, relevés, pleins, statistiques,
+          prévisions et réglages).
+        </p>
+        <div class="chips">
+          @for (s of suggestions; track s) {
+            <button type="button" class="chip" (click)="send(s)">{{ s }}</button>
+          }
+        </div>
+        <p class="privacy small faint">
+          Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question ;
+          elles ne sont pas conservées par l'application ailleurs que dans votre fichier.
+        </p>
+      </div>
+    }
+    @for (m of rendered(); track m.id) {
+      @if (!m.empty) {
+        <div class="msg" [class.user]="m.role === 'user'" [class.error]="m.error">
+          <div class="bubble md" [innerHTML]="m.html"></div>
+        </div>
+      }
+    }
+    @if (ai.busy() && ai.messages().at(-1)?.content === '') {
+      <div class="typing small faint">Claude réfléchit…</div>
+    }
+  </div>
+
+  <form class="composer" (submit)="$event.preventDefault(); send()">
+    <textarea
+      class="textarea"
+      rows="2"
+      placeholder="Votre question…  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)"
+      [value]="draft()"
+      (input)="draft.set($any($event.target).value)"
+      (keydown)="onKey($event)"
+    ></textarea>
+    @if (ai.busy()) {
+      <button type="button" class="btn" (click)="ai.stop()">
+        <app-icon name="stop" [size]="14" /> Arrêter
+      </button>
+    } @else {
+      <button type="submit" class="btn primary" [disabled]="draft().trim() === ''">
+        <app-icon name="send" [size]="14" /> Envoyer
+      </button>
+    }
+  </form>
+}

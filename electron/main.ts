@@ -1,10 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BrowserWindow, app, dialog, ipcMain, nativeTheme, net, protocol, session, shell } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeTheme, net, protocol, safeStorage, session, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { APP_HOST, APP_SCHEME, assetFileUrl, buildContentSecurityPolicy } from './app-protocol';
+import { AiService, sdkClientFactory } from './ai';
+import { SecretStore, type Cipher } from './secrets';
 import { DataFileStore } from './storage';
-import { IPC, type ExportKind, type ThemeMode } from './shared/ipc-contract';
+import { IPC, type AiChatRequest, type AiStatus, type ExportKind, type ThemeMode } from './shared/ipc-contract';
 
 /** URL du serveur de développement Angular, honorée uniquement hors application packagée. */
 const DEV_URL = !app.isPackaged ? (process.env['CONSOMAZOUT_DEV_URL'] ?? null) : null;
@@ -13,6 +15,14 @@ const RENDERER_ROOT = join(__dirname, '..', 'dist', 'consomazout', 'browser');
 const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
 const CSP = buildContentSecurityPolicy(DEV_ORIGIN);
 const MAX_CONTENT_LENGTH = 50 * 1024 * 1024;
+const MAX_MESSAGE_LENGTH = 100_000;
+const MAX_SYSTEM_LENGTH = 2_000_000;
+const MODEL_PATTERN = /^claude-[a-z0-9.-]{1,60}$/;
+
+/** Développement uniquement : adresse d'une API Claude de test (serveur local simulé). */
+const DEV_API_URL = !app.isPackaged ? process.env['CONSOMAZOUT_API_URL'] : undefined;
+/** Développement uniquement : chiffrement factice de la clé, pour les tests automatisés sans Trousseau. */
+const DEV_TEST_CIPHER = !app.isPackaged && process.env['CONSOMAZOUT_TEST_CIPHER'] === '1';
 
 // Développement uniquement : dossier de données isolé pour les essais.
 const DEV_USER_DATA = !app.isPackaged ? process.env['CONSOMAZOUT_USER_DATA'] : undefined;
@@ -49,6 +59,41 @@ function assertString(value: unknown, name: string): string {
   return value;
 }
 
+function assertModel(value: unknown): string {
+  if (typeof value !== 'string' || !MODEL_PATTERN.test(value)) {
+    throw new Error('Paramètre invalide : modèle');
+  }
+  return value;
+}
+
+function assertChat(value: unknown): AiChatRequest {
+  const request = value as Partial<AiChatRequest> | null;
+  if (request === null || typeof request !== 'object' || !Array.isArray(request.messages) || request.messages.length > 200) {
+    throw new Error('Paramètre invalide : conversation');
+  }
+  const messages = request.messages.map((m) => {
+    if ((m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || m.content.length > MAX_MESSAGE_LENGTH) {
+      throw new Error('Paramètre invalide : message');
+    }
+    return { role: m.role, content: m.content };
+  });
+  if (typeof request.system !== 'string' || request.system.length > MAX_SYSTEM_LENGTH) {
+    throw new Error('Paramètre invalide : contexte');
+  }
+  return {
+    requestId: assertString(request.requestId, 'requestId').slice(0, 100),
+    model: assertModel(request.model),
+    system: request.system,
+    messages,
+  };
+}
+
+const testCipher: Cipher = {
+  isEncryptionAvailable: () => true,
+  encryptString: (plain) => Buffer.from(Buffer.from(plain, 'utf-8').toString('base64').split('').reverse().join(''), 'utf-8'),
+  decryptString: (encrypted) => Buffer.from(encrypted.toString().split('').reverse().join(''), 'base64').toString('utf-8'),
+};
+
 function handle(channel: string, handler: (...args: unknown[]) => unknown): void {
   ipcMain.handle(channel, (event, ...args: unknown[]) => {
     if (!fromApp(event)) {
@@ -58,7 +103,7 @@ function handle(channel: string, handler: (...args: unknown[]) => unknown): void
   });
 }
 
-function registerIpc(store: DataFileStore): void {
+function registerIpc(store: DataFileStore, secrets: SecretStore, ai: AiService): void {
   handle(IPC.load, () => store.load());
   handle(IPC.save, (content) => store.save(assertString(content, 'content')));
 
@@ -95,6 +140,33 @@ function registerIpc(store: DataFileStore): void {
   });
 
   handle(IPC.reveal, () => shell.showItemInFolder(store.path));
+
+  const aiStatus = async (): Promise<AiStatus> => ({
+    hasKey: await secrets.hasKey(),
+    encryptionAvailable: secrets.encryptionAvailable,
+  });
+  handle(IPC.aiStatus, aiStatus);
+  handle(IPC.aiSetKey, async (key) => {
+    if (key === null) {
+      await secrets.clear();
+    } else {
+      await secrets.set(assertString(key, 'clé'));
+    }
+    return aiStatus();
+  });
+  handle(IPC.aiTest, (model) => ai.test(assertModel(model)));
+  handle(IPC.aiAbort, (requestId) => ai.abort(assertString(requestId, 'requestId')));
+  ipcMain.handle(IPC.aiChat, (event, request: unknown) => {
+    if (!fromApp(event)) {
+      throw new Error('Appel refusé');
+    }
+    // Le flux est relayé à la page qui l'a demandé ; la promesse se termine à la fin du flux.
+    return ai.chat(assertChat(request), (payload) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IPC.aiEvent, payload);
+      }
+    });
+  });
 
   handle(IPC.theme, (mode) => {
     nativeTheme.themeSource = isThemeMode(mode) ? mode : 'system';
@@ -162,7 +234,10 @@ function bootstrap(): void {
     });
   }
 
-  registerIpc(store);
+  // Clé API chiffrée par le système (Trousseau macOS / DPAPI Windows), dans un fichier distinct des données.
+  const secrets = new SecretStore(join(app.getPath('userData'), 'secrets.bin'), DEV_TEST_CIPHER ? testCipher : safeStorage);
+  const ai = new AiService(() => secrets.get(), sdkClientFactory(DEV_API_URL));
+  registerIpc(store, secrets, ai);
 
   const openWindow = (): void => {
     mainWindow = createWindow();

@@ -19,7 +19,18 @@ if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modu
 fi
 
 npm test
-npm run dist:mac
+
+# Certificat « Apple Development » du trousseau (une équipe gratuite suffit) : signature stable, qui garde
+# l'accès au Trousseau (clé API de l'assistant) d'une version à l'autre. Sinon, signature ad hoc.
+IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"Apple Development: \([^"]*\)".*/\1/p' | head -1)"
+if [ -n "$IDENTITY" ]; then
+  echo "→ signature avec le certificat Apple Development du trousseau"
+  npm run build
+  npx electron-builder --mac --arm64 -c.mac.identity="$IDENTITY"
+else
+  echo "→ pas de certificat Apple Development : signature ad hoc"
+  npm run dist:mac
+fi
 
 VERSION="$(node -p "require('./package.json').version")"
 DMG="release/consomazout-${VERSION}-mac-arm64.dmg"

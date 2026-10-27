@@ -4,7 +4,7 @@
  * d'où les noms de canaux recopiés ici plutôt qu'importés.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ConsoMazoutApi } from './shared/ipc-contract';
+import type { AiStreamEvent, ConsoMazoutApi } from './shared/ipc-contract';
 
 const api: ConsoMazoutApi = {
   platform: process.platform,
@@ -17,6 +17,19 @@ const api: ConsoMazoutApi = {
   },
   theme: {
     set: (mode) => ipcRenderer.invoke('theme:set', mode),
+  },
+  ai: {
+    status: () => ipcRenderer.invoke('ai:status'),
+    setKey: (key) => ipcRenderer.invoke('ai:setKey', key),
+    test: (model) => ipcRenderer.invoke('ai:test', model),
+    chat: (request) => ipcRenderer.invoke('ai:chat', request),
+    abort: (requestId) => ipcRenderer.invoke('ai:abort', requestId),
+    onEvent: (listener) => {
+      // L'événement Electron (et donc ipcRenderer) n'est jamais exposé à la page.
+      const handler = (_event: unknown, payload: AiStreamEvent): void => listener(payload);
+      ipcRenderer.on('ai:event', handler);
+      return () => ipcRenderer.removeListener('ai:event', handler);
+    },
   },
 };
 
