@@ -42,6 +42,11 @@ async function launch() {
 
 // ---------------------------------------------------------------- 1. Données de démonstration
 const { app, page } = await launch();
+// Date figée : les données de démo dépendent du jour, et à certaines dates la cuve vient d'être remplie
+// (plus de place pour montrer un plein). Le 21 octobre 2026, elle est à ~40 cm : la vidéo reste reproductible.
+await page.clock.install({ time: new Date(2026, 9, 21, 10, 0) });
+await page.reload();
+await page.waitForSelector('app-root .sidebar');
 await page.click('a[href="/reglages"]');
 await page.getByRole('button', { name: 'Charger la démo' }).first().click();
 await page.locator('dialog').getByRole('button', { name: 'Charger la démo' }).click();
@@ -243,12 +248,18 @@ await pause(800);
 await type(page.getByPlaceholder('Hauteur mesurée'), '80');
 await pointAt(page.locator('.test-result'));
 await pause(1500);
+await caption('', 'Cinq formes de cuve, dont la cuve à jauge', 'Cylindre, rectangle, table de jaugeage… ou simple capacité en litres');
+const shapes = page.locator('.shapes .shape');
+for (let i = 0; i < (await shapes.count()); i++) {
+  await pointAt(shapes.nth(i), 450);
+  await pause(450);
+}
 await hideCaption();
 
 // ---------------------------------------------------------------- 1. Relevé du jour
 await go('/releves');
 await caption('1', 'Encoder un relevé', 'On mesure la hauteur de mazout dans la cuve et on l’encode');
-const morning = new Date(Date.now() - 2 * 3600_000);
+const morning = new Date((await page.evaluate(() => Date.now())) - 2 * 3600_000); // heure de l'application (horloge figée)
 await click(page.locator('#date'), 300);
 await page.locator('#date').fill(localIso(morning));
 await pause(500);
@@ -287,6 +298,18 @@ await pointAt(page.locator('.table tbody tr').nth(2));
 await pause(1800);
 await hideCaption();
 
+// ---------------------------------------------------------------- 2 bis. Relevé en litres (jauge)
+await caption('2', 'Ou relever la quantité lue sur la jauge', 'Hauteur en cm ou litres : au choix, selon l’équipement de la cuve');
+await click(page.locator('.mode-switch button', { hasText: 'Quantité' }), 600);
+await click(page.locator('.link-btn'), 700);
+await pointAt(page.locator('.preview'));
+await pause(1200);
+await type(page.locator('#note'), 'Lu sur la jauge');
+await click(page.locator('form.entry button[type=submit]'), 1200);
+await pointAt(page.locator('.table tbody tr').first());
+await pause(1800);
+await hideCaption();
+
 // ---------------------------------------------------------------- 3. Plein
 await go('/pleins');
 await caption('3', 'Encoder une recharge de la cuve', 'Date, litres livrés et prix : le total se calcule tout seul');
@@ -298,6 +321,7 @@ await pause(900);
 await type(page.locator('#supplier'), 'Mazout Dupont');
 const afterHeight = demoHeight(demoVolume(todayHeight) + liters);
 await caption('3', 'Encoder une recharge de la cuve', 'La hauteur mesurée après le plein crée aussi un relevé');
+await click(page.locator('.after-switch button', { hasText: 'Hauteur' }), 400);
 await type(page.locator('#after'), String(afterHeight));
 await pause(600);
 await click(page.locator('form.entry button[type=submit]'), 1400);
@@ -309,14 +333,16 @@ await hideCaption();
 
 // ---------------------------------------------------------------- 4. Évolution
 await go('/');
-await caption('4', 'Consulter l’évolution du contenu', 'Relevés, pleins (triangles) et seuil d’alerte sur le graphique');
+await caption('4', 'Consulter l’évolution du contenu', 'Courbe jour par jour : elle descend avec la saison et saute à chaque livraison');
 await scrollContent(250);
 await click(page.getByRole('button', { name: 'Tout', exact: true }), 1200);
 const chart = page.locator('app-chart canvas').first();
 const box = await chart.boundingBox();
 const y = box.y + box.height * 0.45;
-for (let i = 0; i <= 12; i++) {
-  await moveCursor(box.x + 70 + ((box.width * 0.48 - 70) * i) / 12, y, 260);
+await caption('4', 'Survoler la courbe', 'Infobulle : hauteur de mazout, litres et détails de chaque plein (triangles)');
+for (let i = 0; i <= 36; i++) {
+  await moveCursor(box.x + 70 + ((box.width * 0.48 - 70) * i) / 36, y, 240);
+  await pause(i % 6 === 0 ? 500 : 60);
 }
 await pause(1000);
 await hideCaption();
@@ -364,12 +390,35 @@ await click(years.last(), 900);
 await pause(800);
 await hideCaption();
 
+// ---------------------------------------------------------------- 7. Assistant IA et données
+await go('/reglages');
+await caption('7', 'Un assistant qui connaît toutes vos données', 'Claude (Anthropic) répond sur vos relevés, pleins et prévisions, avec votre propre clé API');
+await page.evaluate(() => document.getElementById('ia').scrollIntoView({ block: 'start', behavior: 'instant' }));
+await pause(1200);
+await pointAt(page.locator('#ia'));
+await pause(1500);
+await click(page.locator('.assistant-btn'), 1200);
+await caption('7', 'Le panneau s’ouvre à droite de chaque page', 'La clé est chiffrée par le système ; les données ne partent que lorsque vous posez une question');
+await pointAt(page.locator('.assistant'));
+await pause(2200);
+await hideCaption();
+await click(page.locator('.assistant-btn'), 800);
+await page.evaluate(() => (document.querySelector('.content').scrollTop = 0));
+await caption('7', 'Sauvegarde, export et partage', 'JSON complet, import par fusion entre ordinateurs, CSV pour Excel');
+await page.evaluate(() => document.querySelector('.content').scrollTo({ top: 99999, behavior: 'instant' }));
+await pause(1000);
+await pointAt(page.getByRole('button', { name: 'Exporter les données (JSON)' }));
+await pointAt(page.getByRole('button', { name: 'Importer un fichier…' }));
+await pointAt(page.getByRole('button', { name: 'Conso. mensuelle' }));
+await pause(900);
+await hideCaption();
+
 // ---------------------------------------------------------------- Fin
 await go('/');
 await caption('', 'Thème clair ou sombre', 'Au choix, ou selon le système');
 await click(page.locator('button[title="Thème clair"]'), 1800);
 await hideCaption();
-await titleCard('ConsoMazout', 'Angular 21 · Electron · macOS et Windows', 3000);
+await titleCard('ConsoMazout', 'Angular 21 · Electron · Assistant IA Claude · macOS et Windows', 3000);
 
 await cdp.send('Page.stopScreencast');
 const duration = (Date.now() - started) / 1000;
