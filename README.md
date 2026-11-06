@@ -111,3 +111,13 @@ Elle est répartie jour par jour au prorata d'un poids saisonnier : part d'eau c
 - Consommation annuelle de référence : 2 000 L/an, réglable. Ordre de grandeur tiré du bilan énergétique wallon (environ 19 300 kWh par ménage pour le chauffage et l'eau chaude) et de la fourchette courante de 1 500 à 2 500 L/an pour une maison de 100 à 150 m².
 - Saisonnalité : degrés-jours 15/15 normaux à Uccle (IRM).
 - Eau chaude : 300 L/an pour 4 personnes (estimation).
+
+## Licence
+
+Le code source est disponible sous licence [PolyForm Noncommercial 1.0.0](LICENSE) :
+
+- ✅ télécharger, installer et utiliser l'application pour un usage personnel ou non commercial ;
+- ✅ lire, modifier et partager le code à des fins non commerciales, en conservant la licence ;
+- ❌ vendre l'application, ou réutiliser tout ou partie du code dans un produit ou un service commercial.
+
+Pour un autre usage, contactez l'auteur.

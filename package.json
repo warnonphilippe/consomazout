@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Suivi de la consommation de mazout de la maison : contenu de la cuve, pleins, statistiques et pr\u00e9visions",
   "author": "Philippe Warnon",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "type": "commonjs",
   "main": "dist-electron/main.js",
