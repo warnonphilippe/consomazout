@@ -97,7 +97,7 @@
     </div>
   </div>
 
-  <div class="section" id="ia"><span class="pill violet"><app-icon name="sparkles" [size]="13" /> Assistant IA (Claude)</span></div>
+  <div class="section" id="ia"><span class="pill violet"><app-icon name="sparkles" [size]="13" /> Assistant IA</span></div>
   <div class="card form">
     @if (!ai.available) {
       <div class="callout">
@@ -105,65 +105,201 @@
         <div>L'assistant IA fonctionne dans l'application de bureau.</div>
       </div>
     } @else {
-      <p class="muted small">
-        Avec une clé API Anthropic (console.anthropic.com), l'assistant analyse toutes vos données : cuve, relevés,
-        pleins, statistiques, prévisions et réglages. La clé est chiffrée par le système (Trousseau macOS) et n'est
-        jamais exportée ni affichée. Les appels sont facturés par Anthropic selon votre usage.
-      </p>
-      <div class="key-status">
-        @if (ai.hasKey()) {
-          <span class="badge success"><app-icon name="check" [size]="12" /> Clé enregistrée</span>
-        } @else {
-          <span class="badge warning"><app-icon name="key" [size]="12" /> Aucune clé</span>
-        }
-      </div>
-      @if (!ai.status().encryptionAvailable) {
-        <div class="callout warning small">
-          <app-icon name="alert" [size]="16" />
-          <div>Le chiffrement du système n'est pas disponible : la clé ne peut pas être enregistrée en sécurité.</div>
-        </div>
-      }
-      <div class="key-row">
-        <input
-          class="input"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="sk-ant-…"
-          aria-label="Clé API Anthropic"
-          [value]="keyDraft()"
-          (input)="keyDraft.set($any($event.target).value)"
-          (keydown.enter)="saveKey()"
-        />
-        <button type="button" class="btn primary" [disabled]="keyBusy() || keyDraft().trim() === ''" (click)="saveKey()">
-          <app-icon name="key" [size]="15" /> {{ ai.hasKey() ? 'Remplacer' : 'Enregistrer' }}
-        </button>
-      </div>
-      <div class="form-grid">
-        <div class="field model-field">
-          <label for="model">Modèle</label>
-          <select id="model" class="select" [value]="settings().aiModel" (change)="setModel($event)">
-            @for (m of models; track m.id) {
-              <option [value]="m.id" [selected]="m.id === settings().aiModel">{{ m.label }}</option>
-            }
-          </select>
-        </div>
-      </div>
-      <div class="row">
-        <button type="button" class="btn" [disabled]="keyBusy() || !ai.hasKey()" (click)="testKey()">
-          <app-icon name="refresh" [size]="15" /> Tester la connexion
-        </button>
-        @if (ai.hasKey()) {
-          <button type="button" class="btn danger" (click)="removeKey()">
-            <app-icon name="trash" [size]="15" /> Supprimer la clé
+      <div class="provider-row">
+        <span>Moteur</span>
+        <div class="segmented" role="radiogroup" aria-label="Moteur de l'assistant">
+          <button type="button" role="radio" [attr.aria-checked]="ai.provider() === 'claude'"
+            [class.active]="ai.provider() === 'claude'" (click)="setProvider('claude')">
+            <app-icon name="key" [size]="15" /> Claude (recommandé)
           </button>
-        }
-      </div>
-      @if (testResult(); as r) {
-        <div class="callout" [class.success]="r.ok" [class.danger]="!r.ok">
-          <app-icon [name]="r.ok ? 'check' : 'alert'" />
-          <div>{{ r.message }}</div>
+          <button type="button" role="radio" [attr.aria-checked]="ai.provider() === 'openai'"
+            [class.active]="ai.provider() === 'openai'" (click)="setProvider('openai')">
+            <app-icon name="key" [size]="15" /> OpenAI
+          </button>
+          <button type="button" role="radio" [attr.aria-checked]="ai.provider() === 'local'"
+            [class.active]="ai.provider() === 'local'" (click)="setProvider('local')">
+            <app-icon name="monitor" [size]="15" /> Open source (sans clé)
+          </button>
         </div>
+      </div>
+      @if (ai.provider() === 'claude') {
+        <p class="muted small">
+          Avec une clé API Anthropic (console.anthropic.com), l'assistant analyse toutes vos données : cuve, relevés,
+          pleins, statistiques, prévisions et réglages. La clé est chiffrée par le système (Trousseau macOS) et n'est
+          jamais exportée ni affichée. Les appels sont facturés par Anthropic selon votre usage.
+        </p>
+        <div class="key-status">
+          @if (ai.hasKey()) {
+            <span class="badge success"><app-icon name="check" [size]="12" /> Clé enregistrée</span>
+          } @else {
+            <span class="badge warning"><app-icon name="key" [size]="12" /> Aucune clé</span>
+          }
+        </div>
+        @if (!ai.status().encryptionAvailable) {
+          <div class="callout warning small">
+            <app-icon name="alert" [size]="16" />
+            <div>Le chiffrement du système n'est pas disponible : la clé ne peut pas être enregistrée en sécurité.</div>
+          </div>
+        }
+        <div class="key-row">
+          <input
+            class="input"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="sk-ant-…"
+            aria-label="Clé API Anthropic"
+            [value]="keyDraft()"
+            (input)="keyDraft.set($any($event.target).value)"
+            (keydown.enter)="saveKey()"
+          />
+          <button type="button" class="btn primary" [disabled]="keyBusy() || keyDraft().trim() === ''" (click)="saveKey()">
+            <app-icon name="key" [size]="15" /> {{ ai.hasKey() ? 'Remplacer' : 'Enregistrer' }}
+          </button>
+        </div>
+        <div class="form-grid">
+          <div class="field model-field">
+            <label for="model">Modèle</label>
+            <select id="model" class="select" [value]="settings().aiModel" (change)="setModel($event)">
+              @for (m of models; track m.id) {
+                <option [value]="m.id" [selected]="m.id === settings().aiModel">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn" [disabled]="keyBusy() || !ai.hasKey()" (click)="testKey()">
+            <app-icon name="refresh" [size]="15" /> Tester la connexion
+          </button>
+          @if (ai.hasKey()) {
+            <button type="button" class="btn danger" (click)="removeKey()">
+              <app-icon name="trash" [size]="15" /> Supprimer la clé
+            </button>
+          }
+        </div>
+        @if (testResult(); as r) {
+          <div class="callout" [class.success]="r.ok" [class.danger]="!r.ok">
+            <app-icon [name]="r.ok ? 'check' : 'alert'" />
+            <div>{{ r.message }}</div>
+          </div>
+        }
+      } @else if (ai.provider() === 'openai') {
+        <p class="muted small">
+          Avec une clé API OpenAI (platform.openai.com), l'assistant analyse toutes vos données : cuve, relevés, pleins,
+          statistiques, prévisions et réglages. La clé est chiffrée par le système, rangée à part de celle de Claude, et
+          n'est jamais exportée ni affichée. Les appels sont facturés par OpenAI selon votre usage ; les réponses ne sont
+          pas conservées par OpenAI.
+        </p>
+        <div class="key-status">
+          @if (ai.openaiStatus().hasKey) {
+            <span class="badge success"><app-icon name="check" [size]="12" /> Clé enregistrée</span>
+          } @else {
+            <span class="badge warning"><app-icon name="key" [size]="12" /> Aucune clé</span>
+          }
+        </div>
+        @if (!ai.openaiStatus().encryptionAvailable) {
+          <div class="callout warning small">
+            <app-icon name="alert" [size]="16" />
+            <div>Le chiffrement du système n'est pas disponible : la clé ne peut pas être enregistrée en sécurité.</div>
+          </div>
+        }
+        <div class="key-row">
+          <input
+            class="input"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="sk-…"
+            aria-label="Clé API OpenAI"
+            [value]="openaiKeyDraft()"
+            (input)="openaiKeyDraft.set($any($event.target).value)"
+            (keydown.enter)="saveOpenAiKey()"
+          />
+          <button type="button" class="btn primary" [disabled]="keyBusy() || openaiKeyDraft().trim() === ''" (click)="saveOpenAiKey()">
+            <app-icon name="key" [size]="15" /> {{ ai.openaiStatus().hasKey ? 'Remplacer' : 'Enregistrer' }}
+          </button>
+        </div>
+        <div class="form-grid">
+          <div class="field model-field">
+            <label for="openai-model">Modèle</label>
+            <select id="openai-model" class="select" [value]="settings().openaiModel" (change)="setOpenAiModel($event)">
+              @for (m of openaiModels; track m.id) {
+                <option [value]="m.id" [selected]="m.id === settings().openaiModel">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn" [disabled]="keyBusy() || !ai.openaiStatus().hasKey" (click)="testOpenAiKey()">
+            <app-icon name="refresh" [size]="15" /> Tester la connexion
+          </button>
+          @if (ai.openaiStatus().hasKey) {
+            <button type="button" class="btn danger" (click)="removeOpenAiKey()">
+              <app-icon name="trash" [size]="15" /> Supprimer la clé
+            </button>
+          }
+        </div>
+        @if (testResult(); as r) {
+          <div class="callout" [class.success]="r.ok" [class.danger]="!r.ok">
+            <app-icon [name]="r.ok ? 'check' : 'alert'" />
+            <div>{{ r.message }}</div>
+          </div>
+        }
+      } @else {
+        <p class="muted small">
+          Sans clé API, l'assistant peut utiliser un modèle open source <strong>Qwen</strong> (Alibaba, licence
+          Apache 2.0) qui tourne directement sur cet ordinateur : rien à installer, aucun compte, aucun frais, et vos
+          données ne quittent pas l'ordinateur. Choisissez un modèle puis téléchargez-le une fois. Ses analyses sont
+          moins fines que celles de Claude, qui reste la méthode recommandée.
+        </p>
+        <div class="local-models" role="radiogroup" aria-label="Modèle open source">
+          @for (m of localModels; track m.id) {
+            <button type="button" role="radio" class="preset local-model" [class.active]="m.id === ai.localModel().id"
+              [attr.aria-checked]="m.id === ai.localModel().id" (click)="setLocalModel(m.id)">
+              <span class="local-model-head">
+                <span class="local-model-name">{{ m.label }}</span>
+                @if (isDownloaded(m.id)) {
+                  <span class="badge success"><app-icon name="check" [size]="12" /> Téléchargé</span>
+                }
+              </span>
+              <span class="small muted">{{ m.description }}</span>
+              <span class="small faint">{{ gigabytes(m.sizeBytes) }} à télécharger · {{ m.ramGb }} Go de mémoire conseillés</span>
+            </button>
+          }
+        </div>
+        @if (ai.downloadProgress(); as p) {
+          <div class="download">
+            <div class="download-label small">
+              <span>Téléchargement de {{ labelOf(p.id) }}…</span>
+              <span class="faint">{{ gigabytes(p.receivedBytes) }} / {{ gigabytes(p.totalBytes) }} ({{ percent(p) }} %)</span>
+            </div>
+            <progress class="download-bar" [value]="p.receivedBytes" [max]="p.totalBytes"></progress>
+          </div>
+        }
+        <div class="row">
+          @if (ai.downloadProgress()) {
+            <button type="button" class="btn" (click)="cancelDownload()">
+              <app-icon name="x" [size]="15" /> Annuler le téléchargement
+            </button>
+          } @else if (!ai.localReady()) {
+            <button type="button" class="btn primary" [disabled]="localBusy()" (click)="downloadModel()">
+              <app-icon name="download" [size]="15" /> Télécharger {{ ai.localModel().label }}
+            </button>
+          } @else {
+            <button type="button" class="btn" [disabled]="localBusy()" (click)="testLocal()">
+              <app-icon name="refresh" [size]="15" /> Tester le modèle
+            </button>
+            <button type="button" class="btn danger" [disabled]="localBusy()" (click)="removeModel()">
+              <app-icon name="trash" [size]="15" /> Supprimer le modèle
+            </button>
+          }
+        </div>
+        @if (testResult(); as r) {
+          <div class="callout" [class.success]="r.ok" [class.danger]="!r.ok">
+            <app-icon [name]="r.ok ? 'check' : 'alert'" />
+            <div>{{ r.message }}</div>
+          </div>
+        }
       }
     }
   </div>

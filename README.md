@@ -8,7 +8,10 @@ Application de bureau (**Angular 21 + Electron**) pour suivre la consommation de
 - **Statistiques** par mois, par saison et par année, avec comparaison à une référence belge.
 - **Prévisions** selon la saison : statistique belge, statistique recalée sur la consommation observée, historique réel de la maison. L'application en déduit la date de commande conseillée.
 - **Plusieurs ordinateurs** : export JSON, puis import qui fusionne. Seuls les relevés et pleins absents sont ajoutés ; rien n'est modifié ni supprimé.
-- **Assistant IA (Claude)** : questions en langage naturel sur toutes les données. La clé API est chiffrée par le système et n'est utilisée que dans le process principal.
+- **Assistant IA** : questions en langage naturel sur toutes les données.
+  - **Claude** (recommandé) : la clé API est chiffrée par le système et n'est utilisée que dans le process principal.
+  - **OpenAI** : même principe avec une clé API OpenAI (SDK officiel `openai`, API Responses, `store: false`).
+  - **Sans clé** : modèle open source **Qwen3** exécuté sur l'ordinateur (llama.cpp embarqué via `node-llama-cpp`), téléchargé depuis l'application ; les données ne quittent pas l'ordinateur.
 - Thèmes **clair / sombre / système**, interface en CSS natif, sans bibliothèque de composants.
 
 Le mode d'emploi complet est dans **[docs/GUIDE-UTILISATEUR.md](docs/GUIDE-UTILISATEUR.md)**. Il est aussi lisible dans l'application, page *Aide*.
@@ -70,8 +73,13 @@ electron/                  Process principal (TypeScript → dist-electron/)
   preload.ts               pont contextBridge → window.consoMazout
   storage.ts               fichier JSON (écriture atomique + copie .bak)
   ai.ts                    assistant Claude (SDK officiel @anthropic-ai/sdk) : réponses en flux, repli serveur, erreurs typées
+  openai.ts                assistant OpenAI (SDK officiel openai, API Responses) : réponses en flux, erreurs typées
+  local-ai.ts              assistant open source local : téléchargement des modèles Qwen, réponses en flux, erreurs traduites
+  llama-engine.ts          moteur llama.cpp embarqué (node-llama-cpp, binaires précompilés, chargé à la demande)
   secrets.ts               clé API chiffrée par safeStorage (Trousseau macOS / DPAPI Windows)
   shared/ipc-contract.ts   types partagés avec l'interface
+  shared/local-models.ts   catalogue des modèles Qwen proposés (fichiers GGUF officiels, tailles)
+  shared/openai-models.ts  modèles OpenAI proposés
 src/app/
   core/models/             modèle de données, validation et fusion des fichiers importés (merge.ts)
   core/calc/               calculs purs et testés :

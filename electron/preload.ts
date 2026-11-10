@@ -4,7 +4,7 @@
  * d'où les noms de canaux recopiés ici plutôt qu'importés.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AiStreamEvent, ConsoMazoutApi } from './shared/ipc-contract';
+import type { AiStreamEvent, ConsoMazoutApi, LocalDownloadEvent } from './shared/ipc-contract';
 
 const api: ConsoMazoutApi = {
   platform: process.platform,
@@ -29,6 +29,23 @@ const api: ConsoMazoutApi = {
       const handler = (_event: unknown, payload: AiStreamEvent): void => listener(payload);
       ipcRenderer.on('ai:event', handler);
       return () => ipcRenderer.removeListener('ai:event', handler);
+    },
+    openai: {
+      status: () => ipcRenderer.invoke('ai:openai:status'),
+      setKey: (key) => ipcRenderer.invoke('ai:openai:setKey', key),
+      test: (model) => ipcRenderer.invoke('ai:openai:test', model),
+    },
+    local: {
+      status: () => ipcRenderer.invoke('ai:local:status'),
+      download: (id) => ipcRenderer.invoke('ai:local:download', id),
+      cancelDownload: () => ipcRenderer.invoke('ai:local:cancel'),
+      remove: (id) => ipcRenderer.invoke('ai:local:remove', id),
+      test: (id) => ipcRenderer.invoke('ai:local:test', id),
+      onDownload: (listener) => {
+        const handler = (_event: unknown, payload: LocalDownloadEvent): void => listener(payload);
+        ipcRenderer.on('ai:local:event', handler);
+        return () => ipcRenderer.removeListener('ai:local:event', handler);
+      },
     },
   },
 };

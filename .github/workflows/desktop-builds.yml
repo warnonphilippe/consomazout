@@ -1,0 +1,90 @@
+# Construit les installeurs macOS (Apple Silicon) et Windows (x64), puis vérifie dans chaque application
+# packagée que le moteur des modèles open source (llama.cpp) se charge et répond avec Qwen3 1.7B.
+# Les installeurs sont joints au run comme artefacts, pour des essais manuels.
+name: Builds de bureau
+
+on:
+  pull_request:
+    branches: [develop, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-14
+            dist: dist:mac
+            exe: release/mac-arm64/ConsoMazout.app/Contents/MacOS/ConsoMazout
+            resources: release/mac-arm64/ConsoMazout.app/Contents/Resources
+            installer: release/*.dmg
+          - name: Windows (x64)
+            os: windows-latest
+            dist: dist:win
+            exe: release/win-unpacked/ConsoMazout.exe
+            resources: release/win-unpacked/resources
+            installer: release/*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck et tests
+        if: runner.os == 'macOS'
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Installeur
+        run: npm run ${{ matrix.dist }}
+        env:
+          # Pas de certificat en CI : signature ad hoc sur Mac, installeur non signé sur Windows.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Modèle Qwen3 1.7B (cache)
+        uses: actions/cache@v4
+        with:
+          path: ci-models
+          key: qwen3-1.7b-q8_0-v1
+
+      - name: Téléchargement du modèle
+        shell: bash
+        run: |
+          mkdir -p ci-models
+          if [ ! -f ci-models/Qwen3-1.7B-Q8_0.gguf ]; then
+            curl -fsSL --retry 3 -o ci-models/Qwen3-1.7B-Q8_0.gguf \
+              https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
+          fi
+
+      - name: Moteur llama.cpp dans l'application packagée
+        shell: bash
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+        run: '"${{ matrix.exe }}" scripts/ci/llama-smoke.mjs "${{ matrix.resources }}" ci-models/Qwen3-1.7B-Q8_0.gguf'
+
+      - name: Installeur en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: consomazout-${{ runner.os }}
+          path: ${{ matrix.installer }}
+          if-no-files-found: error
+          retention-days: 14

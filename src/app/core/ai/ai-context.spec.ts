@@ -1,8 +1,8 @@
 import { analyze } from '../calc/analysis';
 import { buildDemoData } from '../calc/demo-data';
-import { toDayNumber } from '../calc/time';
+import { toDayNumber, toLocalIso } from '../calc/time';
 import { DEFAULT_SETTINGS, DEFAULT_TANK, type AppData } from '../models/app-data.model';
-import { buildDataSnapshot, buildSystemPrompt } from './ai-context';
+import { COMPACT_LIMITS, FULL_LIMITS, buildDataSnapshot, buildSystemPrompt } from './ai-context';
 
 describe('contexte de l’assistant', () => {
   const now = toDayNumber('2026-10-18T12:00');
@@ -46,5 +46,30 @@ describe('contexte de l’assistant', () => {
     expect(snapshot['releves']).toEqual([]);
     const gaugeTank: AppData = { ...empty, tank: { ...DEFAULT_TANK, shape: 'gauge', capacityLiters: 2000 } };
     expect((buildDataSnapshot(gaugeTank, analyze(gaugeTank, now), now) as any).cuve.dimensionsCm).toBeNull();
+  });
+
+  it('limites par défaut : celles de Claude, inchangées', () => {
+    expect(FULL_LIMITS).toEqual({ readings: 500, refills: 200 });
+    expect(buildSystemPrompt(data, analysis, now)).toBe(buildSystemPrompt(data, analysis, now, FULL_LIMITS));
+  });
+
+  it('contexte compact pour un modèle local : relevés et pleins les plus récents seulement', () => {
+    const many: AppData = {
+      ...data,
+      readings: Array.from({ length: 150 }, (_, i) => ({
+        id: `r${i}`,
+        date: toLocalIso(new Date(2026, 0, 1 + i, 8, 0)),
+        heightCm: null,
+        liters: 2000 - i * 5,
+        note: '',
+      })),
+    };
+    const snapshot = buildDataSnapshot(many, analyze(many, now), now, COMPACT_LIMITS) as Record<string, any>;
+    expect(snapshot['releves']).toHaveLength(COMPACT_LIMITS.readings);
+    expect(snapshot['releves'].at(-1).date).toBe(many.readings.at(-1)!.date);
+    const full = buildSystemPrompt(many, analyze(many, now), now);
+    const compact = buildSystemPrompt(many, analyze(many, now), now, COMPACT_LIMITS);
+    expect(compact.length).toBeLessThan(full.length);
+    expect(compact.startsWith(full.slice(0, full.indexOf('<donnees>')))).toBe(true);
   });
 });
