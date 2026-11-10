@@ -9,7 +9,7 @@ Application de bureau (**Angular 21 + Electron**) pour suivre la consommation de
 - **Prévisions** selon la saison : statistique belge, statistique recalée sur la consommation observée, historique réel de la maison. L'application en déduit la date de commande conseillée.
 - **Plusieurs ordinateurs** : export JSON, puis import qui fusionne. Seuls les relevés et pleins absents sont ajoutés ; rien n'est modifié ni supprimé.
 - **Assistant IA** : questions en langage naturel sur toutes les données.
-  - **Claude** (recommandé) : la clé API est chiffrée par le système et n'est utilisée que dans le process principal.
+  - **Claude** (recommandé) : la clé API est rangée dans le Trousseau macOS (fichier chiffré par le système sous Windows) et n'est utilisée que dans le process principal.
   - **OpenAI** : même principe avec une clé API OpenAI (SDK officiel `openai`, API Responses, `store: false`).
   - **Sans clé** : modèle open source **Qwen3** exécuté sur l'ordinateur (llama.cpp embarqué via `node-llama-cpp`), téléchargé depuis l'application ; les données ne quittent pas l'ordinateur.
 - Thèmes **clair / sombre / système**, interface en CSS natif, sans bibliothèque de composants.
@@ -76,7 +76,10 @@ electron/                  Process principal (TypeScript → dist-electron/)
   openai.ts                assistant OpenAI (SDK officiel openai, API Responses) : réponses en flux, erreurs typées
   local-ai.ts              assistant open source local : téléchargement des modèles Qwen, réponses en flux, erreurs traduites
   llama-engine.ts          moteur llama.cpp embarqué (node-llama-cpp, binaires précompilés, chargé à la demande)
-  secrets.ts               clé API chiffrée par safeStorage (Trousseau macOS / DPAPI Windows)
+  keychain.ts              Trousseau macOS par /usr/bin/security (valeur passée sur l'entrée standard, relue)
+  secret-store.ts          clés API en mémoire : Trousseau (macOS) ou secrets.ts, reprise des anciens fichiers
+  secrets.ts               repli hors macOS : fichier keys.bin chiffré par safeStorage (DPAPI)
+  legacy-secrets.ts        lecture des anciens secrets.bin / secrets-openai.bin (safeStorage), repris puis supprimés
   shared/ipc-contract.ts   types partagés avec l'interface
   shared/local-models.ts   catalogue des modèles Qwen proposés (fichiers GGUF officiels, tailles)
   shared/openai-models.ts  modèles OpenAI proposés

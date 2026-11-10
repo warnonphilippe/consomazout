@@ -7,7 +7,8 @@ import { AiService, sdkClientFactory } from './ai';
 import { LlamaCppEngine } from './llama-engine';
 import { LocalAiService } from './local-ai';
 import { OpenAiService, openaiClientFactory } from './openai';
-import { SecretStore, type Cipher } from './secrets';
+import { EncryptedFileSecrets, type Cipher } from './secrets';
+import { Secrets, fileBackend, keychainBackend, type SecretName } from './secret-store';
 import { DataFileStore } from './storage';
 import { IPC, type AiChatRequest, type AiStatus, type AiStreamEvent, type ExportKind, type ThemeMode } from './shared/ipc-contract';
 import { findLocalModel } from './shared/local-models';
@@ -134,14 +135,15 @@ function handle(channel: string, handler: (...args: unknown[]) => unknown): void
 }
 
 interface AiServices {
-  readonly secrets: SecretStore;
+  readonly secrets: Secrets;
+  /** Les clés sont lues (et les anciens fichiers repris) : à attendre avant de les interroger. */
+  readonly secretsReady: Promise<void>;
   readonly ai: AiService;
-  readonly openaiSecrets: SecretStore;
   readonly openai: OpenAiService;
   readonly localAi: LocalAiService;
 }
 
-function registerIpc(store: DataFileStore, { secrets, ai, openaiSecrets, openai, localAi }: AiServices): void {
+function registerIpc(store: DataFileStore, { secrets, secretsReady, ai, openai, localAi }: AiServices): void {
   handle(IPC.load, () => store.load());
   handle(IPC.save, (content) => store.save(assertString(content, 'content')));
 
@@ -179,19 +181,18 @@ function registerIpc(store: DataFileStore, { secrets, ai, openaiSecrets, openai,
 
   handle(IPC.reveal, () => shell.showItemInFolder(store.path));
 
-  const aiStatus = async (): Promise<AiStatus> => ({
-    hasKey: await secrets.hasKey(),
-    encryptionAvailable: secrets.encryptionAvailable,
-  });
-  handle(IPC.aiStatus, aiStatus);
-  handle(IPC.aiSetKey, async (key) => {
-    if (key === null) {
-      await secrets.clear();
-    } else {
-      await secrets.set(assertString(key, 'clé'));
-    }
-    return aiStatus();
-  });
+  // Clés API (Trousseau macOS) : gardées par le process principal, jamais renvoyées à la page.
+  const keyStatus = (name: SecretName) => async (): Promise<AiStatus> => {
+    await secretsReady;
+    return { hasKey: secrets.has(name), encryptionAvailable: secrets.encryptionAvailable };
+  };
+  const setKey = (name: SecretName) => async (key: unknown): Promise<AiStatus> => {
+    await secretsReady;
+    await secrets.set(name, key === null ? null : assertString(key, 'clé'));
+    return keyStatus(name)();
+  };
+  handle(IPC.aiStatus, keyStatus('claudeApiKey'));
+  handle(IPC.aiSetKey, setKey('claudeApiKey'));
   handle(IPC.aiTest, (model) => ai.test(assertModel(model)));
   handle(IPC.aiAbort, (requestId) => {
     const id = assertString(requestId, 'requestId');
@@ -216,20 +217,9 @@ function registerIpc(store: DataFileStore, { secrets, ai, openaiSecrets, openai,
     return chat.provider === 'openai' ? openai.chat(chat, emit) : ai.chat(chat, emit);
   });
 
-  // API OpenAI : clé chiffrée dans un fichier distinct, jamais renvoyée à la page.
-  const openaiStatus = async (): Promise<AiStatus> => ({
-    hasKey: await openaiSecrets.hasKey(),
-    encryptionAvailable: openaiSecrets.encryptionAvailable,
-  });
-  handle(IPC.openaiStatus, openaiStatus);
-  handle(IPC.openaiSetKey, async (key) => {
-    if (key === null) {
-      await openaiSecrets.clear();
-    } else {
-      await openaiSecrets.set(assertString(key, 'clé'));
-    }
-    return openaiStatus();
-  });
+  // API OpenAI : clé rangée comme celle de Claude.
+  handle(IPC.openaiStatus, keyStatus('openaiApiKey'));
+  handle(IPC.openaiSetKey, setKey('openaiApiKey'));
   handle(IPC.openaiTest, (model) => openai.test(assertOpenAiModel(model)));
 
   // Modèles open source locaux : état, téléchargement (progression par événements), suppression, test.
@@ -316,15 +306,31 @@ function bootstrap(): void {
     });
   }
 
-  // Clé API chiffrée par le système (Trousseau macOS / DPAPI Windows), dans un fichier distinct des données.
-  const secrets = new SecretStore(join(app.getPath('userData'), 'secrets.bin'), DEV_TEST_CIPHER ? testCipher : safeStorage);
-  const ai = new AiService(() => secrets.get(), sdkClientFactory(DEV_API_URL));
-  const cipher = DEV_TEST_CIPHER ? testCipher : safeStorage;
-  const openaiSecrets = new SecretStore(join(app.getPath('userData'), 'secrets-openai.bin'), cipher);
-  const openai = new OpenAiService(() => openaiSecrets.get(), openaiClientFactory(DEV_OPENAI_API_URL));
+  // Clés API dans le Trousseau macOS (un élément visible par clé dans Trousseau d'accès) ; fichier chiffré par le
+  // système ailleurs. Les anciens fichiers `safeStorage` (secrets.bin, secrets-openai.bin) sont repris une fois.
+  const userData = app.getPath('userData');
+  const cipher: Cipher = DEV_TEST_CIPHER ? testCipher : safeStorage;
+  const secrets = new Secrets(
+    process.platform === 'darwin' && !DEV_TEST_CIPHER
+      ? keychainBackend()
+      : fileBackend(new EncryptedFileSecrets(join(userData, 'keys.bin'), cipher)),
+    {
+      cipher,
+      paths: { claudeApiKey: join(userData, 'secrets.bin'), openaiApiKey: join(userData, 'secrets-openai.bin') },
+    },
+  );
+  const secretsReady = secrets.load().then(() => secrets.migrateLegacy()).then(() => undefined);
+  const ai = new AiService(async () => {
+    await secretsReady;
+    return secrets.get('claudeApiKey');
+  }, sdkClientFactory(DEV_API_URL));
+  const openai = new OpenAiService(async () => {
+    await secretsReady;
+    return secrets.get('openaiApiKey');
+  }, openaiClientFactory(DEV_OPENAI_API_URL));
   // Modèles open source (sans clé API) : téléchargés dans le dossier de l'application, exécutés localement.
   const localAi = new LocalAiService(join(app.getPath('userData'), 'models'), new LlamaCppEngine());
-  registerIpc(store, { secrets, ai, openaiSecrets, openai, localAi });
+  registerIpc(store, { secrets, secretsReady, ai, openai, localAi });
   // Modèle local en mémoire : il est libéré avant de quitter, ses tâches natives ne doivent pas survivre au
   // moteur JS. Sans modèle local utilisé, la fermeture n'est pas retardée (comportement d'origine).
   let released = false;

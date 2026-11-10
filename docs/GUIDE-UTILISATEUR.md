@@ -294,7 +294,7 @@ L'assistant connaît vos données telles qu'elles sont au moment de la question.
 
 - Avec le modèle open source, **vos données ne quittent pas l'ordinateur** : seul le fichier du modèle est téléchargé (depuis Hugging Face), une fois.
 - Avec OpenAI, vos données sont envoyées à OpenAI quand vous posez une question ; l'application demande à OpenAI de **ne pas conserver** les réponses.
-- La clé est **chiffrée par le système** : Trousseau macOS sur Mac, chiffrement de Windows sur PC. Elle est rangée dans un fichier séparé des données. Elle n'est jamais affichée, exportée ni incluse dans le fichier d'échange JSON : sur un autre ordinateur, encodez-la à nouveau.
+- La clé est rangée dans le **Trousseau macOS** sur Mac (élément « ConsoMazout — clé API … », visible et modifiable dans Trousseau d'accès, lu au démarrage sans rien demander) et dans un fichier chiffré par Windows sur PC. Elle n'est jamais affichée, exportée ni incluse dans le fichier d'échange JSON : sur un autre ordinateur, encodez-la à nouveau. Les clés enregistrées par une version précédente sont reprises automatiquement au premier démarrage.
 - Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question.
 - Les réponses sont des analyses à partir de vos données, pas des certitudes. Elles sont d'autant plus fiables que les relevés sont fréquents.
 

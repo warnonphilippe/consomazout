@@ -9,33 +9,35 @@ export interface Cipher {
 }
 
 /**
- * Stockage de la clé API, chiffré par le système (Trousseau macOS / DPAPI Windows).
- * Fichier distinct des données : la clé n'est jamais exportée ni synchronisée.
- * Si le chiffrement n'est pas disponible, la clé est refusée plutôt qu'écrite en clair.
+ * Secrets rangés dans un fichier chiffré par le système (`safeStorage` : DPAPI sous Windows). Sert de repli là où le
+ * Trousseau macOS n'existe pas. Fichier distinct des données : jamais exporté ni synchronisé. Si le chiffrement
+ * n'est pas disponible, l'écriture est refusée plutôt que faite en clair.
  */
-export class SecretStore {
+export class EncryptedFileSecrets {
   constructor(
     private readonly path: string,
     private readonly cipher: Cipher,
   ) {}
 
-  get encryptionAvailable(): boolean {
-    return this.cipher.isEncryptionAvailable();
+  async read(name: string): Promise<string | null> {
+    return (await this.readAll())[name] ?? null;
   }
 
-  async hasKey(): Promise<boolean> {
-    return (await this.read()) !== null;
+  async write(name: string, value: string): Promise<void> {
+    await this.save({ ...(await this.readAll()), [name]: value });
   }
 
-  async get(): Promise<string | null> {
-    return this.read();
-  }
-
-  async set(key: string): Promise<void> {
-    const trimmed = key.trim();
-    if (trimmed.length < 20 || trimmed.length > 400 || /\s/.test(trimmed)) {
-      throw new Error('Cette clé API n’a pas un format valide.');
+  async remove(name: string): Promise<void> {
+    const all = await this.readAll();
+    delete all[name];
+    if (Object.keys(all).length === 0) {
+      await rm(this.path, { force: true });
+    } else {
+      await this.save(all);
     }
+  }
+
+  private async save(all: Record<string, string>): Promise<void> {
     if (!this.cipher.isEncryptionAvailable()) {
       throw new Error(
         'Le chiffrement du système n’est pas disponible : la clé ne peut pas être enregistrée en sécurité.',
@@ -43,25 +45,22 @@ export class SecretStore {
     }
     await mkdir(dirname(this.path), { recursive: true });
     const tmp = `${this.path}.tmp`;
-    await writeFile(tmp, this.cipher.encryptString(trimmed), { mode: 0o600 });
+    await writeFile(tmp, this.cipher.encryptString(JSON.stringify(all)), { mode: 0o600 });
     await rename(tmp, this.path);
   }
 
-  async clear(): Promise<void> {
-    await rm(this.path, { force: true });
-  }
-
-  private async read(): Promise<string | null> {
+  private async readAll(): Promise<Record<string, string>> {
     let encrypted: Buffer;
     try {
       encrypted = await readFile(this.path);
     } catch {
-      return null;
+      return {};
     }
     try {
-      return this.cipher.decryptString(encrypted);
+      const parsed: unknown = JSON.parse(this.cipher.decryptString(encrypted));
+      return parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
     } catch {
-      return null;
+      return {};
     }
   }
 }

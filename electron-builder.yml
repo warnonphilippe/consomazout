@@ -41,7 +41,8 @@ mac:
   icon: build/icon.icns
   # Par défaut : signature ad hoc, indispensable pour qu'une app arm64 se lance. Sur un autre Mac, lever la
   # quarantaine (voir le guide). release/build.sh signe plutôt avec le certificat « Apple Development » du
-  # trousseau quand il existe : une identité stable garde l'accès au Trousseau (clé API) d'une version à l'autre.
+  # trousseau quand il existe. Les clés API sont dans le Trousseau par l'outil `security` : elles ne dépendent pas de
+  # la signature de l'application.
   identity: '-'
   hardenedRuntime: false
 

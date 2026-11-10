@@ -20,8 +20,8 @@ fi
 
 npm test
 
-# Certificat « Apple Development » du trousseau (une équipe gratuite suffit) : signature stable, qui garde
-# l'accès au Trousseau (clé API de l'assistant) d'une version à l'autre. Sinon, signature ad hoc.
+# Certificat « Apple Development » du trousseau (une équipe gratuite suffit) : signature stable. Sinon, signature ad hoc.
+# (Les clés API sont dans le Trousseau par l'outil `security` : elles ne dépendent pas de la signature.)
 IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"Apple Development: \([^"]*\)".*/\1/p' | head -1)"
 if [ -n "$IDENTITY" ]; then
   echo "→ signature avec le certificat Apple Development du trousseau"
