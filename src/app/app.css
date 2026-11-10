@@ -171,6 +171,9 @@
 .content {
   overflow-y: auto;
   min-width: 0;
+  /* Les pages s'adaptent à la largeur réelle de la zone de contenu (@container),
+     qui rétrécit quand le panneau de l'assistant est ouvert, et pas à celle de la fenêtre. */
+  container-type: inline-size;
 }
 
 .toasts {

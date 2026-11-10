@@ -41,9 +41,24 @@
   grid-template-columns: minmax(260px, 1.5fr) repeat(4, minmax(0, 1fr));
 }
 
-@media (max-width: 1250px) {
+@container (max-width: 1020px) {
   .kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 720px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kpis > .level-kpi {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (max-width: 480px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -70,6 +85,11 @@
 
 .kpi.alert {
   border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+}
+
+.kpi {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .kpi-value small {

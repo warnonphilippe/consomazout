@@ -5,7 +5,7 @@
   align-items: start;
 }
 
-@media (max-width: 1100px) {
+@container (max-width: 880px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }

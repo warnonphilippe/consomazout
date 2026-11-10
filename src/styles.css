@@ -216,7 +216,7 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
-@media (max-width: 1100px) {
+@container (max-width: 880px) {
   .grid-2,
   .grid-3 {
     grid-template-columns: minmax(0, 1fr);
@@ -809,7 +809,7 @@ dialog.modal .modal-foot {
   align-items: start;
 }
 
-@media (max-width: 1100px) {
+@container (max-width: 880px) {
   .entry-layout {
     grid-template-columns: minmax(0, 1fr);
   }
