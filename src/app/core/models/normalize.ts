@@ -1,5 +1,7 @@
 import {
   AI_MODELS,
+  LOCAL_MODELS,
+  OPENAI_MODELS,
   DEFAULT_SETTINGS,
   DEFAULT_TANK,
   emptyData,
@@ -108,6 +110,14 @@ function normalizeSettings(raw: Raw): Settings {
     orderLeadDays: num(raw['orderLeadDays'], DEFAULT_SETTINGS.orderLeadDays),
     theme: theme === 'light' || theme === 'dark' || theme === 'system' ? theme : DEFAULT_SETTINGS.theme,
     aiModel: AI_MODELS.some((m) => m.id === raw['aiModel']) ? (raw['aiModel'] as string) : DEFAULT_SETTINGS.aiModel,
+    // Fichiers d'avant les modèles open source : Claude, comme auparavant.
+    aiProvider: raw['aiProvider'] === 'local' || raw['aiProvider'] === 'openai' ? raw['aiProvider'] : 'claude',
+    openaiModel: OPENAI_MODELS.some((m) => m.id === raw['openaiModel'])
+      ? (raw['openaiModel'] as string)
+      : DEFAULT_SETTINGS.openaiModel,
+    localModel: LOCAL_MODELS.some((m) => m.id === raw['localModel'])
+      ? (raw['localModel'] as string)
+      : DEFAULT_SETTINGS.localModel,
   };
 }
 

@@ -235,20 +235,51 @@ Le **seuil d'alerte** et le **délai de commande** sont décrits dans la section
 
 Choisissez **Clair**, **Sombre** ou **Système**. Le mode Système suit le réglage de macOS ou de Windows. Le choix est aussi disponible en bas de la barre latérale.
 
-## Assistant IA (Claude)
+## Assistant IA
 
 L'assistant répond à vos questions sur la cuve en s'appuyant sur **toutes vos données** : description de la cuve, relevés, pleins et prix, consommation mois par mois, niveau reconstitué, statistiques, prévisions des trois profils et réglages. Par exemple : « Quand dois-je commander le prochain plein, et combien ? », « Ma consommation est-elle normale ? », « Y a-t-il des relevés suspects ? ».
 
-### Mise en route
+Trois moteurs sont possibles, au choix dans **Réglages → Assistant IA → Moteur** :
+- **Claude (recommandé)** : le modèle d'Anthropic, le plus précis. Il faut une clé API Anthropic.
+- **OpenAI** : les modèles GPT, si vous avez déjà une clé API OpenAI.
+- **Open source (sans clé)** : un modèle Qwen qui tourne sur votre ordinateur, gratuit et sans compte. Ses analyses sont plus simples.
+
+### Mise en route avec Claude (recommandé)
 
 1. Créez une clé API sur [console.anthropic.com](https://console.anthropic.com) (compte Anthropic, avec un moyen de paiement : les appels sont facturés selon l'usage).
-2. Dans **Réglages → Assistant IA (Claude)**, collez la clé et cliquez sur **Enregistrer**.
+2. Dans **Réglages → Assistant IA**, choisissez le moteur **Claude**, collez la clé et cliquez sur **Enregistrer**.
 3. Choisissez le **modèle** :
    - Claude Opus 5.5, par défaut : le plus précis ;
    - Claude Sonnet 5.5 : équilibré ;
    - Claude Haiku 5.5 : rapide et économique ;
    - Claude Fable 5.1 : le plus capable, mais plus coûteux.
 4. Cliquez sur **Tester la connexion**. Ce test vérifie la clé et le modèle sans rien générer, donc sans frais.
+
+### Mise en route avec OpenAI
+
+1. Créez une clé API sur [platform.openai.com](https://platform.openai.com/api-keys) (compte OpenAI avec du crédit : les appels sont facturés selon l'usage).
+2. Dans **Réglages → Assistant IA**, choisissez le moteur **OpenAI**, collez la clé et cliquez sur **Enregistrer**. Elle est rangée à part de la clé Claude : vous pouvez garder les deux et passer de l'une à l'autre.
+3. Choisissez le **modèle** : GPT-6.1 Sol par défaut (le plus récent), GPT-6.1 Terra, GPT-6 Luna, ou la gamme GPT-5.4 (GPT-5.4, mini, nano : plus rapides et économiques).
+4. Cliquez sur **Tester la connexion** : la clé et l'accès au modèle sont vérifiés sans rien générer, donc sans frais. Si le modèle n'est pas accessible avec votre compte, choisissez-en un autre.
+
+### Mise en route sans clé : modèle open source (Qwen)
+
+Si vous n'avez pas de clé API Claude, l'assistant peut utiliser **Qwen**, un modèle open source (Alibaba, licence Apache 2.0). Il fonctionne entièrement sur votre ordinateur : rien d'autre à installer, aucun compte, aucun frais.
+
+1. Dans **Réglages → Assistant IA**, choisissez le moteur **Open source (sans clé)**.
+2. Choisissez le modèle :
+   - **Qwen3 1.7B (léger)** : 1,8 Go à télécharger, le plus rapide, pour les ordinateurs modestes ;
+   - **Qwen3 4B (recommandé)** : 2,5 Go, bon équilibre entre qualité et rapidité ;
+   - **Qwen3 8B (plus précis)** : 5 Go, pour les ordinateurs récents avec 16 Go de mémoire.
+3. Cliquez sur **Télécharger**. Le téléchargement se fait une seule fois ; une barre indique la progression et **Annuler** l'interrompt.
+4. Cliquez sur **Tester le modèle** pour vérifier qu'il se charge sur votre ordinateur.
+
+Bon à savoir :
+- La première question après le démarrage est plus lente : le modèle se charge en mémoire. Les suivantes sont plus rapides.
+- Sur un Mac Apple Silicon, le modèle utilise la puce graphique et répond vite. Sur un PC sans carte graphique récente, il tourne sur le processeur et peut être lent : préférez alors le modèle léger.
+- Pour rester rapide, le modèle local reçoit vos relevés et pleins les plus récents (et non tout l'historique), en plus des statistiques et prévisions.
+- **Supprimer le modèle** libère l'espace disque. Il peut être téléchargé à nouveau à tout moment.
+- Les modèles sont rangés dans le dossier `models` à côté du fichier de données (voir *Sauvegarde et données*).
 
 ### Utilisation
 
@@ -261,6 +292,8 @@ L'assistant connaît vos données telles qu'elles sont au moment de la question.
 
 ### Sécurité et confidentialité
 
+- Avec le modèle open source, **vos données ne quittent pas l'ordinateur** : seul le fichier du modèle est téléchargé (depuis Hugging Face), une fois.
+- Avec OpenAI, vos données sont envoyées à OpenAI quand vous posez une question ; l'application demande à OpenAI de **ne pas conserver** les réponses.
 - La clé est **chiffrée par le système** : Trousseau macOS sur Mac, chiffrement de Windows sur PC. Elle est rangée dans un fichier séparé des données. Elle n'est jamais affichée, exportée ni incluse dans le fichier d'échange JSON : sur un autre ordinateur, encodez-la à nouveau.
 - Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question.
 - Les réponses sont des analyses à partir de vos données, pas des certitudes. Elles sont d'autant plus fiables que les relevés sont fréquents.

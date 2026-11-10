@@ -1,0 +1,89 @@
+# Vérifie la PR (typecheck + tests), construit l'installeur Windows (x64) et vérifie dans l'application
+# packagée que le moteur des modèles open source (llama.cpp) se charge et répond avec Qwen3 1.7B.
+# L'installeur est joint au run comme artefact, pour des essais manuels.
+# Le .dmg macOS n'est pas construit en CI : il se construit sur un Mac avec ./release/build.sh.
+name: Builds de bureau
+
+on:
+  pull_request:
+    branches: [develop, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Typecheck et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests (interface puis process principal)
+        run: npm test
+
+  windows:
+    name: Windows (x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Installeur
+        run: npm run dist:win
+        env:
+          # Pas de certificat en CI : installeur non signé.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Modèle Qwen3 1.7B (cache)
+        uses: actions/cache@v4
+        with:
+          path: ci-models
+          key: qwen3-1.7b-q8_0-v1
+
+      - name: Téléchargement du modèle
+        shell: bash
+        run: |
+          mkdir -p ci-models
+          if [ ! -f ci-models/Qwen3-1.7B-Q8_0.gguf ]; then
+            curl -fsSL --retry 3 -o ci-models/Qwen3-1.7B-Q8_0.gguf \
+              https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
+          fi
+
+      - name: Moteur llama.cpp dans l'application packagée
+        shell: bash
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+        run: '"release/win-unpacked/ConsoMazout.exe" scripts/ci/llama-smoke.mjs "release/win-unpacked/resources" ci-models/Qwen3-1.7B-Q8_0.gguf'
+
+      - name: Installeur en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: consomazout-Windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14

@@ -1,6 +1,9 @@
-import type { ThemeMode } from '../../../../electron/shared/ipc-contract';
+import type { AiProvider, ThemeMode } from '../../../../electron/shared/ipc-contract';
+import { DEFAULT_LOCAL_MODEL, LOCAL_MODELS } from '../../../../electron/shared/local-models';
+import { DEFAULT_OPENAI_MODEL, OPENAI_MODELS } from '../../../../electron/shared/openai-models';
 
-export type { ThemeMode };
+export type { AiProvider, ThemeMode };
+export { LOCAL_MODELS, OPENAI_MODELS };
 
 /**
  * `gauge` : cuve équipée d'une jauge affichant directement les litres, dont on ne connaît que la capacité.
@@ -94,6 +97,12 @@ export interface Settings {
   theme: ThemeMode;
   /** Modèle Claude utilisé par l'assistant IA. */
   aiModel: string;
+  /** Moteur de l'assistant : API Claude (recommandé), API OpenAI ou modèle open source sur l'ordinateur. */
+  aiProvider: AiProvider;
+  /** Modèle OpenAI utilisé quand `aiProvider` vaut `openai`. */
+  openaiModel: string;
+  /** Modèle open source (Qwen) utilisé quand `aiProvider` vaut `local`. */
+  localModel: string;
 }
 
 export interface AppData {
@@ -118,6 +127,9 @@ export const DEFAULT_SETTINGS: Settings = {
   orderLeadDays: 14,
   theme: 'system',
   aiModel: 'claude-opus-5-5',
+  aiProvider: 'claude',
+  openaiModel: DEFAULT_OPENAI_MODEL,
+  localModel: DEFAULT_LOCAL_MODEL,
 };
 
 /** Modèles proposés pour l'assistant (identifiants exacts de l'API Claude). */

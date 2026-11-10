@@ -31,12 +31,26 @@
       façon chiffrée et n'est jamais exposée à la page.
     </p>
   </div>
-} @else if (!ai.hasKey()) {
-  <div class="notice">
-    <app-icon name="key" />
-    <p>Ajoutez votre clé API Claude pour activer l'assistant.</p>
-    <a class="btn primary sm" routerLink="/reglages" fragment="ia">Ouvrir les réglages</a>
-  </div>
+} @else if (!ai.ready()) {
+  @if (ai.provider() === 'local') {
+    <div class="notice">
+      <app-icon name="download" />
+      <p>Téléchargez le modèle open source {{ ai.localModel().label }} pour activer l'assistant sans clé API.</p>
+      <a class="btn primary sm" routerLink="/reglages" fragment="ia">Ouvrir les réglages</a>
+    </div>
+  } @else if (ai.provider() === 'openai') {
+    <div class="notice">
+      <app-icon name="key" />
+      <p>Ajoutez votre clé API OpenAI pour activer l'assistant.</p>
+      <a class="btn primary sm" routerLink="/reglages" fragment="ia">Ouvrir les réglages</a>
+    </div>
+  } @else {
+    <div class="notice">
+      <app-icon name="key" />
+      <p>Ajoutez votre clé API Claude pour activer l'assistant.</p>
+      <a class="btn primary sm" routerLink="/reglages" fragment="ia">Ouvrir les réglages</a>
+    </div>
+  }
 } @else {
   <div class="messages" #list aria-live="polite">
     @if (rendered().length === 0) {
@@ -51,10 +65,22 @@
             <button type="button" class="chip" (click)="send(s)">{{ s }}</button>
           }
         </div>
-        <p class="privacy small faint">
-          Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question ;
-          elles ne sont pas conservées par l'application ailleurs que dans votre fichier.
-        </p>
+        @if (ai.provider() === 'local') {
+          <p class="privacy small faint">
+            Modèle open source {{ ai.localModel().label }}, exécuté sur cet ordinateur : vos données ne
+            quittent pas l'ordinateur. Pour des analyses plus fines, préférez Claude (réglages).
+          </p>
+        } @else if (ai.provider() === 'openai') {
+          <p class="privacy small faint">
+            Vos données ne sont envoyées à OpenAI que lorsque vous posez une question ; OpenAI ne conserve pas les
+            réponses et l'application ne garde rien ailleurs que dans votre fichier.
+          </p>
+        } @else {
+          <p class="privacy small faint">
+            Vos données ne sont envoyées à Claude (Anthropic) que lorsque vous posez une question ;
+            elles ne sont pas conservées par l'application ailleurs que dans votre fichier.
+          </p>
+        }
       </div>
     }
     @for (m of rendered(); track m.id) {
@@ -65,7 +91,7 @@
       }
     }
     @if (ai.busy() && ai.messages().at(-1)?.content === '') {
-      <div class="typing small faint">Claude réfléchit…</div>
+      <div class="typing small faint">{{ ai.provider() === 'local' ? 'Qwen réfléchit…' : ai.provider() === 'openai' ? 'GPT réfléchit…' : 'Claude réfléchit…' }}</div>
     }
   </div>
 

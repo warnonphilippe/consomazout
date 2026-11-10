@@ -3,7 +3,17 @@ import { monthlyCsv, readingsCsv, refillsCsv } from '../../core/calc/csv';
 import { UCCLE_DEGREE_DAYS } from '../../core/calc/degree-days';
 import { MONTH_SHORT } from '../../core/calc/time';
 import { AiService } from '../../core/ai/ai.service';
-import { AI_MODELS, REFERENCE_PRESETS, type AppData, type ReferencePreset, type ThemeMode } from '../../core/models/app-data.model';
+import {
+  AI_MODELS,
+  LOCAL_MODELS,
+  OPENAI_MODELS,
+  REFERENCE_PRESETS,
+  type AiProvider,
+  type AppData,
+  type ReferencePreset,
+  type ThemeMode,
+} from '../../core/models/app-data.model';
+import type { LocalDownloadProgress } from '../../../../electron/shared/ipc-contract';
 import type { MergeReport } from '../../core/models/merge';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { DataStore } from '../../core/services/data-store.service';
@@ -41,6 +51,10 @@ export default class SettingsPage {
   protected readonly keyDraft = signal('');
   protected readonly keyBusy = signal(false);
   protected readonly testResult = signal<{ ok: boolean; message: string } | null>(null);
+  protected readonly openaiModels = OPENAI_MODELS;
+  protected readonly openaiKeyDraft = signal('');
+  protected readonly localModels = LOCAL_MODELS;
+  protected readonly localBusy = signal(false);
 
   protected readonly themeModes: { mode: ThemeMode; icon: IconName; label: string }[] = [
     { mode: 'light', icon: 'sun', label: 'Clair' },
@@ -124,6 +138,130 @@ export default class SettingsPage {
   protected setModel(event: Event): void {
     this.store.updateSettings({ aiModel: (event.target as HTMLSelectElement).value });
     this.testResult.set(null);
+  }
+
+  protected setProvider(provider: AiProvider): void {
+    if (provider !== this.ai.provider()) {
+      this.store.updateSettings({ aiProvider: provider });
+      this.testResult.set(null);
+      if (provider === 'local') {
+        void this.ai.refreshLocalStatus();
+      } else if (provider === 'openai') {
+        void this.ai.refreshOpenAiStatus();
+      }
+    }
+  }
+
+  protected async saveOpenAiKey(): Promise<void> {
+    const key = this.openaiKeyDraft().trim();
+    if (key === '' || this.keyBusy()) {
+      return;
+    }
+    this.keyBusy.set(true);
+    try {
+      await this.ai.setOpenAiKey(key);
+      this.openaiKeyDraft.set('');
+      this.testResult.set(null);
+      this.toast.show('Clé API OpenAI enregistrée, chiffrée par le système.');
+    } catch (error) {
+      this.toast.show(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      this.keyBusy.set(false);
+    }
+  }
+
+  protected async removeOpenAiKey(): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: 'Supprimer la clé API OpenAI ?',
+      message: 'L’assistant ne pourra plus utiliser OpenAI jusqu’à ce que vous enregistriez une nouvelle clé.',
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (ok) {
+      await this.ai.clearOpenAiKey();
+      this.testResult.set(null);
+      this.toast.show('Clé API OpenAI supprimée.');
+    }
+  }
+
+  protected async testOpenAiKey(): Promise<void> {
+    this.keyBusy.set(true);
+    this.testResult.set(null);
+    try {
+      this.testResult.set(await this.ai.testOpenAi());
+    } catch (error) {
+      this.testResult.set({ ok: false, message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      this.keyBusy.set(false);
+    }
+  }
+
+  protected setOpenAiModel(event: Event): void {
+    this.store.updateSettings({ openaiModel: (event.target as HTMLSelectElement).value });
+    this.testResult.set(null);
+  }
+
+  protected setLocalModel(id: string): void {
+    this.store.updateSettings({ localModel: id });
+    this.testResult.set(null);
+  }
+
+  protected isDownloaded(id: string): boolean {
+    return this.ai.localStatus().models.some((m) => m.id === id && m.downloaded);
+  }
+
+  protected labelOf(id: string): string {
+    return LOCAL_MODELS.find((m) => m.id === id)?.label ?? id;
+  }
+
+  protected gigabytes(bytes: number): string {
+    return `${(bytes / 1e9).toLocaleString('fr-BE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Go`;
+  }
+
+  protected percent(p: LocalDownloadProgress): number {
+    return p.totalBytes > 0 ? Math.floor((p.receivedBytes / p.totalBytes) * 100) : 0;
+  }
+
+  protected async downloadModel(): Promise<void> {
+    this.testResult.set(null);
+    await this.runLocal(() => this.ai.downloadModel(this.ai.localModel().id));
+  }
+
+  protected async cancelDownload(): Promise<void> {
+    await this.runLocal(() => this.ai.cancelDownload());
+  }
+
+  protected async testLocal(): Promise<void> {
+    this.testResult.set(null);
+    await this.runLocal(async () => this.testResult.set(await this.ai.testLocal()));
+  }
+
+  protected async removeModel(): Promise<void> {
+    const model = this.ai.localModel();
+    const ok = await this.confirm.ask({
+      title: `Supprimer ${model.label} ?`,
+      message: `Le fichier du modèle (${this.gigabytes(model.sizeBytes)}) sera effacé de cet ordinateur. Il pourra être téléchargé à nouveau.`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (ok) {
+      this.testResult.set(null);
+      await this.runLocal(async () => {
+        await this.ai.removeModel(model.id);
+        this.toast.show('Modèle supprimé.');
+      });
+    }
+  }
+
+  private async runLocal(task: () => Promise<void>): Promise<void> {
+    this.localBusy.set(true);
+    try {
+      await task();
+    } catch (error) {
+      this.toast.show(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      this.localBusy.set(false);
+    }
   }
 
   protected selectPreset(key: Exclude<ReferencePreset, 'custom'>): void {

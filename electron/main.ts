@@ -4,9 +4,14 @@ import { BrowserWindow, app, dialog, ipcMain, nativeTheme, net, protocol, safeSt
 import type { IpcMainInvokeEvent } from 'electron';
 import { APP_HOST, APP_SCHEME, assetFileUrl, buildContentSecurityPolicy } from './app-protocol';
 import { AiService, sdkClientFactory } from './ai';
+import { LlamaCppEngine } from './llama-engine';
+import { LocalAiService } from './local-ai';
+import { OpenAiService, openaiClientFactory } from './openai';
 import { SecretStore, type Cipher } from './secrets';
 import { DataFileStore } from './storage';
-import { IPC, type AiChatRequest, type AiStatus, type ExportKind, type ThemeMode } from './shared/ipc-contract';
+import { IPC, type AiChatRequest, type AiStatus, type AiStreamEvent, type ExportKind, type ThemeMode } from './shared/ipc-contract';
+import { findLocalModel } from './shared/local-models';
+import { isOpenAiModel } from './shared/openai-models';
 
 /** URL du serveur de développement Angular, honorée uniquement hors application packagée. */
 const DEV_URL = !app.isPackaged ? (process.env['CONSOMAZOUT_DEV_URL'] ?? null) : null;
@@ -21,6 +26,8 @@ const MODEL_PATTERN = /^claude-[a-z0-9.-]{1,60}$/;
 
 /** Développement uniquement : adresse d'une API Claude de test (serveur local simulé). */
 const DEV_API_URL = !app.isPackaged ? process.env['CONSOMAZOUT_API_URL'] : undefined;
+/** Développement uniquement : adresse d'une API OpenAI de test (serveur local simulé). */
+const DEV_OPENAI_API_URL = !app.isPackaged ? process.env['CONSOMAZOUT_OPENAI_API_URL'] : undefined;
 /** Développement uniquement : chiffrement factice de la clé, pour les tests automatisés sans Trousseau. */
 const DEV_TEST_CIPHER = !app.isPackaged && process.env['CONSOMAZOUT_TEST_CIPHER'] === '1';
 
@@ -66,6 +73,21 @@ function assertModel(value: unknown): string {
   return value;
 }
 
+function assertOpenAiModel(value: unknown): string {
+  if (!isOpenAiModel(value)) {
+    throw new Error('Paramètre invalide : modèle OpenAI');
+  }
+  return value;
+}
+
+function assertLocalModel(value: unknown): string {
+  const model = findLocalModel(value);
+  if (model === undefined) {
+    throw new Error('Paramètre invalide : modèle local');
+  }
+  return model.id;
+}
+
 function assertChat(value: unknown): AiChatRequest {
   const request = value as Partial<AiChatRequest> | null;
   if (request === null || typeof request !== 'object' || !Array.isArray(request.messages) || request.messages.length > 200) {
@@ -80,8 +102,16 @@ function assertChat(value: unknown): AiChatRequest {
   if (typeof request.system !== 'string' || request.system.length > MAX_SYSTEM_LENGTH) {
     throw new Error('Paramètre invalide : contexte');
   }
+  const requestId = assertString(request.requestId, 'requestId').slice(0, 100);
+  if (request.provider === 'openai') {
+    return { requestId, provider: 'openai', model: assertOpenAiModel(request.model), system: request.system, messages };
+  }
+  if (request.provider === 'local') {
+    return { requestId, provider: 'local', model: assertLocalModel(request.model), system: request.system, messages };
+  }
+  // Claude : requête identique à celle d'avant l'ajout des modèles locaux.
   return {
-    requestId: assertString(request.requestId, 'requestId').slice(0, 100),
+    requestId,
     model: assertModel(request.model),
     system: request.system,
     messages,
@@ -103,7 +133,15 @@ function handle(channel: string, handler: (...args: unknown[]) => unknown): void
   });
 }
 
-function registerIpc(store: DataFileStore, secrets: SecretStore, ai: AiService): void {
+interface AiServices {
+  readonly secrets: SecretStore;
+  readonly ai: AiService;
+  readonly openaiSecrets: SecretStore;
+  readonly openai: OpenAiService;
+  readonly localAi: LocalAiService;
+}
+
+function registerIpc(store: DataFileStore, { secrets, ai, openaiSecrets, openai, localAi }: AiServices): void {
   handle(IPC.load, () => store.load());
   handle(IPC.save, (content) => store.save(assertString(content, 'content')));
 
@@ -155,18 +193,62 @@ function registerIpc(store: DataFileStore, secrets: SecretStore, ai: AiService):
     return aiStatus();
   });
   handle(IPC.aiTest, (model) => ai.test(assertModel(model)));
-  handle(IPC.aiAbort, (requestId) => ai.abort(assertString(requestId, 'requestId')));
+  handle(IPC.aiAbort, (requestId) => {
+    const id = assertString(requestId, 'requestId');
+    ai.abort(id);
+    openai.abort(id);
+    localAi.abort(id);
+  });
   ipcMain.handle(IPC.aiChat, (event, request: unknown) => {
     if (!fromApp(event)) {
       throw new Error('Appel refusé');
     }
+    const chat = assertChat(request);
     // Le flux est relayé à la page qui l'a demandé ; la promesse se termine à la fin du flux.
-    return ai.chat(assertChat(request), (payload) => {
+    const emit = (payload: AiStreamEvent): void => {
       if (!event.sender.isDestroyed()) {
         event.sender.send(IPC.aiEvent, payload);
       }
-    });
+    };
+    if (chat.provider === 'local') {
+      return localAi.chat(chat, emit);
+    }
+    return chat.provider === 'openai' ? openai.chat(chat, emit) : ai.chat(chat, emit);
   });
+
+  // API OpenAI : clé chiffrée dans un fichier distinct, jamais renvoyée à la page.
+  const openaiStatus = async (): Promise<AiStatus> => ({
+    hasKey: await openaiSecrets.hasKey(),
+    encryptionAvailable: openaiSecrets.encryptionAvailable,
+  });
+  handle(IPC.openaiStatus, openaiStatus);
+  handle(IPC.openaiSetKey, async (key) => {
+    if (key === null) {
+      await openaiSecrets.clear();
+    } else {
+      await openaiSecrets.set(assertString(key, 'clé'));
+    }
+    return openaiStatus();
+  });
+  handle(IPC.openaiTest, (model) => openai.test(assertOpenAiModel(model)));
+
+  // Modèles open source locaux : état, téléchargement (progression par événements), suppression, test.
+  handle(IPC.localStatus, () => localAi.status());
+  ipcMain.handle(IPC.localDownload, (event, id: unknown) => {
+    if (!fromApp(event)) {
+      throw new Error('Appel refusé');
+    }
+    const promise = localAi.download(assertLocalModel(id), (payload) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IPC.localEvent, payload);
+      }
+    });
+    // Le téléchargement continue en arrière-plan ; seules les erreurs de démarrage sont renvoyées.
+    return Promise.race([promise, new Promise<void>((resolve) => setTimeout(resolve, 0))]);
+  });
+  handle(IPC.localCancel, () => localAi.cancelDownload());
+  handle(IPC.localRemove, (id) => localAi.remove(assertLocalModel(id)));
+  handle(IPC.localTest, (id) => localAi.test(assertLocalModel(id)));
 
   handle(IPC.theme, (mode) => {
     nativeTheme.themeSource = isThemeMode(mode) ? mode : 'system';
@@ -237,7 +319,25 @@ function bootstrap(): void {
   // Clé API chiffrée par le système (Trousseau macOS / DPAPI Windows), dans un fichier distinct des données.
   const secrets = new SecretStore(join(app.getPath('userData'), 'secrets.bin'), DEV_TEST_CIPHER ? testCipher : safeStorage);
   const ai = new AiService(() => secrets.get(), sdkClientFactory(DEV_API_URL));
-  registerIpc(store, secrets, ai);
+  const cipher = DEV_TEST_CIPHER ? testCipher : safeStorage;
+  const openaiSecrets = new SecretStore(join(app.getPath('userData'), 'secrets-openai.bin'), cipher);
+  const openai = new OpenAiService(() => openaiSecrets.get(), openaiClientFactory(DEV_OPENAI_API_URL));
+  // Modèles open source (sans clé API) : téléchargés dans le dossier de l'application, exécutés localement.
+  const localAi = new LocalAiService(join(app.getPath('userData'), 'models'), new LlamaCppEngine());
+  registerIpc(store, { secrets, ai, openaiSecrets, openai, localAi });
+  // Modèle local en mémoire : il est libéré avant de quitter, ses tâches natives ne doivent pas survivre au
+  // moteur JS. Sans modèle local utilisé, la fermeture n'est pas retardée (comportement d'origine).
+  let released = false;
+  app.on('will-quit', (event) => {
+    if (!released && localAi.needsRelease) {
+      event.preventDefault();
+      released = true;
+      void localAi
+        .dispose()
+        .catch(() => undefined)
+        .finally(() => setImmediate(() => app.quit()));
+    }
+  });
 
   const openWindow = (): void => {
     mainWindow = createWindow();

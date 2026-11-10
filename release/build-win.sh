@@ -24,6 +24,22 @@ if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modu
 fi
 
 npm test
+
+# Moteur des modèles open source : npm n'installe que les binaires llama.cpp de la machine qui construit.
+# Depuis macOS ou Linux, on ajoute ceux de Windows x64 (CPU et Vulkan), sans toucher au reste de node_modules.
+LLAMA_VERSION="$(node -p "require('./node_modules/node-llama-cpp/package.json').version")"
+for PKG in win-x64 win-x64-vulkan; do
+  DEST="node_modules/@node-llama-cpp/${PKG}"
+  if [ ! -f "${DEST}/package.json" ] || [ "$(node -p "require('./${DEST}/package.json').version")" != "${LLAMA_VERSION}" ]; then
+    echo "→ binaires llama.cpp ${PKG} ${LLAMA_VERSION}"
+    TMP="$(mktemp -d)"
+    (cd "$TMP" && npm pack --silent "@node-llama-cpp/${PKG}@${LLAMA_VERSION}" >/dev/null)
+    rm -rf "$DEST" && mkdir -p "$DEST"
+    tar -xzf "$TMP"/*.tgz -C "$DEST" --strip-components=1
+    rm -rf "$TMP"
+  fi
+done
+
 npm run dist:win
 
 VERSION="$(node -p "require('./package.json').version")"

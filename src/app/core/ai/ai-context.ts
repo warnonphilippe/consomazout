@@ -5,8 +5,20 @@ import { heightForVolume, supportsHeight, tankHeightCm } from '../calc/tank-volu
 import { dayNumberToDate, monthKey, toDayNumber, toLocalIso, yearMonthOf } from '../calc/time';
 import type { AppData, Tank } from '../models/app-data.model';
 
-const MAX_READINGS = 500;
-const MAX_REFILLS = 200;
+/** Nombre maximal de relevés et de pleins joints au contexte (les plus récents). */
+export interface SnapshotLimits {
+  readonly readings: number;
+  readonly refills: number;
+}
+
+/** Limites pour Claude (contexte très large). */
+export const FULL_LIMITS: SnapshotLimits = { readings: 500, refills: 200 };
+
+/**
+ * Limites pour un modèle open source local : contexte plus réduit et évaluation plus lente du prompt.
+ * Un relevé coûte environ 100 jetons ; les séries mensuelles et annuelles couvrent toujours tout l'historique.
+ */
+export const COMPACT_LIMITS: SnapshotLimits = { readings: 20, refills: 20 };
 
 const r0 = (v: number): number => Math.round(v);
 const r1 = (v: number): number => Math.round(v * 10) / 10;
@@ -18,7 +30,12 @@ function heightOf(tank: Tank | null, liters: number): number | null {
 }
 
 /** Instantané compact de toutes les données de l'application, joint au contexte de l'assistant. */
-export function buildDataSnapshot(data: AppData, analysis: FullAnalysis, now: number): Record<string, unknown> {
+export function buildDataSnapshot(
+  data: AppData,
+  analysis: FullAnalysis,
+  now: number,
+  limits: SnapshotLimits = FULL_LIMITS,
+): Record<string, unknown> {
   const { settings } = data;
   const tank = analysis.tank;
   const consumption = analysis.consumption;
@@ -26,7 +43,7 @@ export function buildDataSnapshot(data: AppData, analysis: FullAnalysis, now: nu
   const series = consumption ? levelSeries(consumption) : { points: [], refills: [] };
   const afterRefill = new Map(series.refills.map((m) => [m.refill.id, m.liters]));
 
-  const readings = (consumption?.levels ?? []).slice(-MAX_READINGS).map((level) => {
+  const readings = (consumption?.levels ?? []).slice(-limits.readings).map((level) => {
     const interval = intervalByTo.get(level.reading.id);
     return {
       date: level.reading.date,
@@ -51,7 +68,7 @@ export function buildDataSnapshot(data: AppData, analysis: FullAnalysis, now: nu
   const refills = data.refills
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-MAX_REFILLS)
+    .slice(-limits.refills)
     .map((r) => {
       const after = afterRefill.get(r.id);
       return {
@@ -199,6 +216,11 @@ Glossaire :
 Règles : ne devine pas ; si une donnée manque ou est trop incertaine, dis-le et indique quelle mesure la préciserait (par exemple un relevé juste après une livraison). Signale les relevés suspects ou les longues périodes sans relevé. Donne des conseils concrets (quand commander, comment réduire la consommation, fréquence des relevés) sans promettre d'économies précises ni donner de conseil financier garanti.`;
 
 /** Contexte complet (rôle + données) passé en `system` à Claude. */
-export function buildSystemPrompt(data: AppData, analysis: FullAnalysis, now: number): string {
-  return `${ROLE}\n\n<donnees>\n${JSON.stringify(buildDataSnapshot(data, analysis, now))}\n</donnees>`;
+export function buildSystemPrompt(
+  data: AppData,
+  analysis: FullAnalysis,
+  now: number,
+  limits: SnapshotLimits = FULL_LIMITS,
+): string {
+  return `${ROLE}\n\n<donnees>\n${JSON.stringify(buildDataSnapshot(data, analysis, now, limits))}\n</donnees>`;
 }

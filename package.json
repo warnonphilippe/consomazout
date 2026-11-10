@@ -57,6 +57,8 @@
     "node": ">=22.12"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.137.0"
+    "@anthropic-ai/sdk": "0.137.0",
+    "node-llama-cpp": "3.22.3",
+    "openai": "7.55.0"
   }
 }

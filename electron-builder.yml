@@ -9,14 +9,28 @@ directories:
   output: release
   buildResources: build
 
-# esbuild embarque déjà tout le front dans dist/ ; seule la dépendance du process principal
-# (@anthropic-ai/sdk) est empaquetée. Angular, Chart.js… sont en devDependencies.
+# esbuild embarque déjà tout le front dans dist/ ; seules les dépendances du process principal
+# (@anthropic-ai/sdk, openai, node-llama-cpp) sont empaquetées. Angular, Chart.js… sont en devDependencies.
 files:
   - dist/consomazout/browser/**/*
   - dist-electron/**/*.js
   - package.json
+  # Moteur llama.cpp (modèles open source locaux) : seuls les binaires précompilés de la plateforme cible.
+  # Les sources de llama.cpp (compilation locale, jamais utilisée) et les variantes CUDA (très lourdes)
+  # sont exclues ; Metal (Mac) et Vulkan/CPU (Windows) suffisent.
+  - '!node_modules/node-llama-cpp/llama/gitRelease.bundle'
+  - '!node_modules/node-llama-cpp/bins/**/*'
+  - node_modules/node-llama-cpp/bins/${os}-${arch}*/**/*
+  - '!node_modules/node-llama-cpp/llama/localBuilds/**/*'
+  - '!node_modules/@node-llama-cpp/*/bins/**/*'
+  - node_modules/@node-llama-cpp/${os}-${arch}*/bins/**/*
+  - '!node_modules/@node-llama-cpp/*cuda*/**/*'
 asar: true
-# Aucun module natif à recompiler pour Electron.
+# Les bibliothèques natives de llama.cpp doivent rester hors de l'archive asar pour être chargées.
+asarUnpack:
+  - node_modules/node-llama-cpp/bins
+  - node_modules/@node-llama-cpp/*
+# Binaires N-API précompilés (node-llama-cpp) : rien à recompiler pour Electron.
 npmRebuild: false
 
 mac:
