@@ -1,4 +1,4 @@
-// Vérification du moteur des modèles open source dans l'application PACKAGÉE (CI macOS / Windows).
+// Vérification du moteur des modèles open source dans l'application PACKAGÉE (CI Windows ; utilisable aussi sur Mac).
 //
 // Lancé avec l'exécutable de l'application en mode Node :
 //   ELECTRON_RUN_AS_NODE=1 <ConsoMazout> scripts/ci/llama-smoke.mjs <dossier resources> <modèle .gguf>
