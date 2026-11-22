@@ -111,6 +111,16 @@ Seules les **hauteurs** des relevés sont stockées. Les litres sont toujours re
 
 En développement, la variable `CONSOMAZOUT_USER_DATA=/un/dossier` isole les données.
 
+### Dossier des modèles partagé
+
+Les fichiers GGUF peuvent être partagés avec les autres applications locales (ConsoElec, ConsoMazout, Assistant RAG, Plan Rando) pour ne télécharger qu'une fois un même modèle. Le dossier est choisi dans cet ordre :
+
+1. variable d'environnement `LOCAL_MODELS_DIR` (chemin absolu, `~` accepté) ;
+2. clé `modelsDir` du fichier commun `~/.config/local-models/config.json`, par exemple `{ "modelsDir": "~/models" }` ;
+3. sinon le dossier propre à l'application, `<userData>/models` (comportement historique).
+
+Le fichier commun est conseillé sur macOS : une application lancée depuis le Finder ne voit pas les variables du terminal. Dans un dossier partagé, supprimer un modèle depuis une application le supprime pour toutes.
+
 ### Calcul de la consommation
 
 Entre deux relevés, la consommation vaut `litres(relevé 1) + pleins livrés entre les deux − litres(relevé 2)`.
