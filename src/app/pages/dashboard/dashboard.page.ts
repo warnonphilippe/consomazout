@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { consumptionBetween } from '../../core/calc/consumption';
 import { dailyRate, type ProfileKey } from '../../core/calc/forecast';
+import { STALE_AFTER_DAYS, summaryAgeDays } from '../../core/link/household-summary';
+import { LinkService } from '../../core/link/link.service';
 import { DataStore } from '../../core/services/data-store.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ChartComponent } from '../../shared/chart/chart.component';
@@ -11,6 +13,8 @@ import { IconComponent } from '../../shared/icon.component';
 import { TankGaugeComponent } from '../../shared/tank-gauge.component';
 import { ThemeService } from '../../core/services/theme.service';
 import { PROFILE_COLOR, levelChart, monthlyForecastChart } from './dashboard-charts';
+
+const UPDATED_FORMAT = new Intl.DateTimeFormat('fr-BE', { day: 'numeric', month: 'short', year: 'numeric' });
 
 @Component({
   selector: 'app-dashboard-page',
@@ -26,6 +30,21 @@ export default class DashboardPage {
 
   protected readonly analysis = this.store.analysis;
   protected readonly now = this.store.now;
+
+  /** Électricité de la maison, d'après le résumé publié par ConsoElec (cadre masqué sans résumé). */
+  private readonly link = inject(LinkService);
+  protected readonly electricity = computed(() => {
+    const e = this.link.peer();
+    if (e === null) {
+      return null;
+    }
+    const at = new Date(e.genereLe);
+    return {
+      summary: e,
+      updated: Number.isNaN(at.getTime()) ? 'date inconnue' : `mis à jour le ${UPDATED_FORMAT.format(at)}`,
+      stale: summaryAgeDays(e, Date.now()) > STALE_AFTER_DAYS,
+    };
+  });
 
   protected readonly historyOptions = [
     { label: '6 mois', days: 183 },

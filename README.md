@@ -121,6 +121,12 @@ Les fichiers GGUF peuvent être partagés avec les autres applications locales (
 
 Le fichier commun est conseillé sur macOS : une application lancée depuis le Finder ne voit pas les variables du terminal. Dans un dossier partagé, supprimer un modèle depuis une application le supprime pour toutes.
 
+### Lien avec ConsoElec
+
+ConsoMazout et ConsoElec échangent un résumé de leurs estimations par le dossier `~/.config/conso-maison` (`consomazout.json`, `consoelec.json` ; `~/.config/conso-maison-dev` pour `npm run dev`, ou la variable `CONSO_MAISON_DIR`). Chaque application publie le sien à chaque changement (jamais les données de démonstration) et lit celui de l'autre : l'assistant IA le reçoit dans son contexte et peut croiser mazout et électricité (1 L ≈ 10 kWh), et un cadre « Électricité » du tableau de bord le résume. Le format est décrit dans `src/app/core/link/household-summary.ts`, recopié à l'identique dans ConsoElec.
+
+Un serveur MCP (dans le dépôt ConsoElec, dossier `mcp/`) expose ces deux résumés à Claude Desktop ou Claude Code.
+
 ### Calcul de la consommation
 
 Entre deux relevés, la consommation vaut `litres(relevé 1) + pleins livrés entre les deux − litres(relevé 2)`.

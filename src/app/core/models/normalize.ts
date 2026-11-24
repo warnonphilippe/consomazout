@@ -35,6 +35,7 @@ export function normalizeData(input: unknown): AppData {
     readings: asArray(input['readings']).map(normalizeReading).filter((r): r is Reading => r !== null),
     refills: asArray(input['refills']).map(normalizeRefill).filter((r): r is Refill => r !== null),
     settings: isObject(input['settings']) ? normalizeSettings(input['settings']) : base.settings,
+    ...(input['demo'] === true ? { demo: true as const } : {}),
   };
 }
 

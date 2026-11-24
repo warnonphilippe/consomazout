@@ -6,6 +6,7 @@ import { APP_HOST, APP_SCHEME, assetFileUrl, buildContentSecurityPolicy } from '
 import { AiService, sdkClientFactory } from './ai';
 import { LlamaCppEngine } from './llama-engine';
 import { LocalAiService } from './local-ai';
+import { HouseholdLink, isLinkedApp, resolveLinkDir } from './household-link';
 import { resolveModelsDir } from './models-dir';
 import { OpenAiService, openaiClientFactory } from './openai';
 import { EncryptedFileSecrets, type Cipher } from './secrets';
@@ -247,6 +248,17 @@ function registerIpc(store: DataFileStore, { secrets, secretsReady, ai, openai, 
   });
 }
 
+/** Résumés échangés avec ConsoElec (dossier `~/.config/conso-maison`, lu aussi par le serveur MCP). */
+function registerLinkIpc(link: HouseholdLink): void {
+  handle(IPC.linkPublish, (content) => link.publish(assertString(content, 'content')));
+  handle(IPC.linkRead, (target) => {
+    if (!isLinkedApp(target) || target === link.self) {
+      throw new Error('Paramètre invalide : app');
+    }
+    return link.read(target);
+  });
+}
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1400,
@@ -333,6 +345,7 @@ function bootstrap(): void {
   // Dossier partagé (LOCAL_MODELS_DIR ou ~/.config/local-models/config.json), sinon userData/models.
   const localAi = new LocalAiService(resolveModelsDir(join(app.getPath('userData'), 'models')), new LlamaCppEngine());
   registerIpc(store, { secrets, secretsReady, ai, openai, localAi });
+  registerLinkIpc(new HouseholdLink(resolveLinkDir({ dev: !app.isPackaged }), 'consomazout'));
   // Modèle local en mémoire : il est libéré avant de quitter, ses tâches natives ne doivent pas survivre au
   // moteur JS. Sans modèle local utilisé, la fermeture n'est pas retardée (comportement d'origine).
   let released = false;

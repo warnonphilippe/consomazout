@@ -8,6 +8,8 @@ import type {
   LocalDownloadProgress,
   LocalModelsStatus,
 } from '../../../../electron/shared/ipc-contract';
+import { LinkService } from '../link/link.service';
+import type { ElecSummary } from '../link/household-summary';
 import { LOCAL_MODELS, type AiProvider, type AppData } from '../models/app-data.model';
 import { newId } from '../models/normalize';
 import { DataStore } from '../services/data-store.service';
@@ -29,6 +31,7 @@ export interface ChatMessage {
 export class AiService {
   private readonly store = inject(DataStore);
   private readonly toast = inject(ToastService);
+  private readonly link = inject(LinkService);
   private readonly api = typeof window !== 'undefined' ? (window.consoMazout?.ai ?? null) : null;
 
   /** Les appels à Claude passent par l'application de bureau ; indisponibles dans un simple navigateur. */
@@ -66,7 +69,12 @@ export class AiService {
    * Contexte figé pour la conversation en cours : identique d'un tour à l'autre, il reste en cache
    * côté Claude. Il est reconstruit seulement si les données changent.
    */
-  private context: { data: AppData; provider: AiProvider; system: string } | null = null;
+  private context: {
+    data: AppData;
+    provider: AiProvider;
+    peer: ElecSummary | null;
+    system: string;
+  } | null = null;
 
   constructor() {
     if (this.api !== null) {
@@ -165,6 +173,8 @@ export class AiService {
       { id: requestId, role: 'assistant', content: '' },
     ]);
     this.busy.set(true);
+    // Résumé de ConsoElec à jour pour le contexte (sans effet s'il n'a pas changé).
+    await this.link.refreshPeer();
     const history = this.messages()
       .filter((m) => !m.error && m.id !== requestId && m.content !== '')
       .map((m) => ({ role: m.role, content: m.content }));
@@ -199,15 +209,21 @@ export class AiService {
 
   private systemPrompt(provider: AiProvider): string {
     const data = this.store.data();
-    if (this.context === null || this.context.data !== data || this.context.provider !== provider) {
+    const peer = this.link.peer();
+    if (
+      this.context === null ||
+      this.context.data !== data ||
+      this.context.provider !== provider ||
+      this.context.peer !== peer
+    ) {
       const analysis = this.store.analysis();
       const now = this.store.now();
       // Modèle local : contexte plus court, limité aux relevés et pleins les plus récents.
       const system =
         provider === 'local'
-          ? buildSystemPrompt(data, analysis, now, COMPACT_LIMITS)
-          : buildSystemPrompt(data, analysis, now);
-      this.context = { data, provider, system };
+          ? buildSystemPrompt(data, analysis, now, COMPACT_LIMITS, peer)
+          : buildSystemPrompt(data, analysis, now, undefined, peer);
+      this.context = { data, provider, peer, system };
     }
     return this.context.system;
   }

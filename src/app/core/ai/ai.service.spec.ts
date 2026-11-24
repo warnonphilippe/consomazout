@@ -24,6 +24,7 @@ function fakeApi(localStatus: LocalModelsStatus) {
       reveal: async () => undefined,
     },
     theme: { set: async () => undefined },
+    link: { publish: async () => undefined, read: async () => null },
     ai: {
       status: async () => ({ hasKey: true, encryptionAvailable: true }),
       setKey: async () => ({ hasKey: true, encryptionAvailable: true }),

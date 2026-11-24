@@ -118,6 +118,26 @@
           <span class="kpi-sub">{{ o.best.litersToOrder | liters }} à {{ analysis().refills.lastPrice | price }}</span>
         }
       </div>
+
+      @if (electricity(); as el) {
+        @let e = el.summary;
+        <div class="card kpi" title="Résumé publié par ConsoElec sur cet ordinateur (dossier ~/.config/conso-maison)">
+          <span class="kpi-label"><app-icon name="bolt" [size]="15" /> Électricité · 12 mois</span>
+          <span class="kpi-value">{{ e.estimationAnnuelle.soutirageKwh | num }} <small>kWh</small></span>
+          <span class="kpi-sub">
+            soutirage prévu · injection {{ e.estimationAnnuelle.injectionKwh | num }} kWh
+            @if (e.derniers12Mois; as last) {
+              @if (last.consommationMaisonKwh !== null) {
+                <br />maison {{ last.consommationMaisonKwh | num }} kWh · solaire {{ last.productionPvKwh | num }} kWh
+                @if (last.joursCouvertsSolaire !== null && last.joursCouvertsSolaire < 360) {
+                  (sur {{ last.joursCouvertsSolaire | num }} j)
+                }
+              }
+            }
+          </span>
+          <span class="kpi-sub faint" [class.tone-warning]="el.stale">ConsoElec, {{ el.updated }}</span>
+        </div>
+      }
     </div>
   }
 

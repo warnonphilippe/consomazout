@@ -80,6 +80,9 @@ export type LocalDownloadEvent =
   | { readonly type: 'cancelled'; readonly id: string }
   | { readonly type: 'error'; readonly id: string; readonly message: string };
 
+/** Application de la maison avec laquelle ConsoMazout échange un résumé (dossier `~/.config/conso-maison`). */
+export type LinkedApp = 'consoelec' | 'consomazout';
+
 export interface ConsoMazoutApi {
   readonly platform: string;
   readonly data: {
@@ -94,6 +97,13 @@ export interface ConsoMazoutApi {
   };
   readonly theme: {
     set(mode: ThemeMode): Promise<void>;
+  };
+  /** Résumés échangés avec les autres applications de la maison (ConsoElec). */
+  readonly link: {
+    /** Publie le résumé JSON de ConsoMazout. */
+    publish(content: string): Promise<void>;
+    /** Résumé publié par l'autre application, ou `null`. */
+    read(app: LinkedApp): Promise<unknown>;
   };
   readonly ai: {
     status(): Promise<AiStatus>;
@@ -134,6 +144,8 @@ export const IPC = {
   importFile: 'data:import',
   reveal: 'data:reveal',
   theme: 'theme:set',
+  linkPublish: 'link:publish',
+  linkRead: 'link:read',
   aiStatus: 'ai:status',
   aiSetKey: 'ai:setKey',
   aiTest: 'ai:test',

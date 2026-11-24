@@ -2,6 +2,7 @@ import { analyze } from '../calc/analysis';
 import { buildDemoData } from '../calc/demo-data';
 import { toDayNumber, toLocalIso } from '../calc/time';
 import { DEFAULT_SETTINGS, DEFAULT_TANK, type AppData } from '../models/app-data.model';
+import type { ElecSummary } from '../link/household-summary';
 import { COMPACT_LIMITS, FULL_LIMITS, buildDataSnapshot, buildSystemPrompt } from './ai-context';
 
 describe('contexte de l’assistant', () => {
@@ -30,6 +31,20 @@ describe('contexte de l’assistant', () => {
     const gauge = snapshot['releves'].find((r: any) => r.note === 'lu sur la jauge');
     expect(gauge.mesure).toEqual({ type: 'quantité lue sur la jauge', litres: 800 });
     expect(snapshot['releves'][0].mesure.type).toBe('hauteur mesurée');
+  });
+
+  it('joint le résumé de ConsoElec avec son âge, seulement s’il existe', () => {
+    expect(buildSystemPrompt(data, analysis, now)).not.toContain('<donnees_consoelec ageJours');
+    const peer = {
+      schema: 1,
+      application: 'consoelec',
+      genereLe: '2026-10-08T10:00:00.000Z',
+      estimationAnnuelle: { soutirageKwh: 3100, injectionKwh: 4200 },
+    } as unknown as ElecSummary;
+    const system = buildSystemPrompt(data, analysis, now, COMPACT_LIMITS, peer);
+    const block = /<donnees_consoelec ageJours="(\d+)">\n(.*)\n<\/donnees_consoelec>/s.exec(system)!;
+    expect(block[1]).toBe('10');
+    expect(JSON.parse(block[2]!).estimationAnnuelle.soutirageKwh).toBe(3100);
   });
 
   it('rôle en français puis données JSON délimitées', () => {

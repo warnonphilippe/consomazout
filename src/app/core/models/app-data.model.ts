@@ -111,6 +111,8 @@ export interface AppData {
   readings: Reading[];
   refills: Refill[];
   settings: Settings;
+  /** Données de démonstration : jamais publiées vers les autres applications de la maison. */
+  demo?: true;
 }
 
 export const REFERENCE_PRESETS: Record<Exclude<ReferencePreset, 'custom'>, { label: string; liters: number }> = {

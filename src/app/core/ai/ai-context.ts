@@ -3,6 +3,7 @@ import { levelSeries } from '../calc/consumption';
 import { UCCLE_DEGREE_DAYS } from '../calc/degree-days';
 import { heightForVolume, supportsHeight, tankHeightCm } from '../calc/tank-volume';
 import { dayNumberToDate, monthKey, toDayNumber, toLocalIso, yearMonthOf } from '../calc/time';
+import { MAZOUT_KWH_PER_LITER, STALE_AFTER_DAYS, summaryAgeDays, type ElecSummary } from '../link/household-summary';
 import type { AppData, Tank } from '../models/app-data.model';
 
 /** Nombre maximal de relevés et de pleins joints au contexte (les plus récents). */
@@ -215,12 +216,27 @@ Glossaire :
 
 Règles : ne devine pas ; si une donnée manque ou est trop incertaine, dis-le et indique quelle mesure la préciserait (par exemple un relevé juste après une livraison). Signale les relevés suspects ou les longues périodes sans relevé. Donne des conseils concrets (quand commander, comment réduire la consommation, fréquence des relevés) sans promettre d'économies précises ni donner de conseil financier garanti.`;
 
-/** Contexte complet (rôle + données) passé en `system` à Claude. */
+const LINK_ROLE = `Données de ConsoElec (bloc <donnees_consoelec>, quand il est présent) : résumé publié par ConsoElec, l'application de suivi de l'électricité de la même maison (compteur intelligent, panneaux solaires). Clés : « estimationAnnuelle » = soutirage et injection prévus sur les 12 prochains mois côté compteur (kWh, heures pleines HP / creuses HC), « derniers12Mois » = mesuré (avec production solaire, autoconsommation et consommation réelle de la maison quand l'index de production est connu ; la période peut faire moins d'un an : voir « joursCouverts » et « joursCouvertsSolaire »), « annuel » et « mensuel » = historique, « anneeFacturation » = soldes et coût estimé de l'année de facturation, « maison » = description (chauffage, panneaux). Ce sont des estimations d'une autre application, à citer comme telles avec leur date (« genereLe ») ; signale-les comme anciennes au-delà de ${STALE_AFTER_DAYS} jours.
+Pour comparer les deux énergies : 1 litre de mazout ≈ ${MAZOUT_KWH_PER_LITER} kWh d'énergie (pouvoir calorifique inférieur) et une chaudière au mazout en restitue environ 85 % en chaleur utile ; la consommation électrique n'est pas du chauffage (sauf radiateur d'appoint). Raisonne en croisant les deux quand c'est utile : part du mazout dans l'énergie de la maison, coût par kWh utile du mazout et de l'électricité, effet de l'hiver sur les deux, intérêt d'un radiateur alimenté par le surplus solaire, d'une pompe à chaleur (≈ 3 kWh de chaleur par kWh électrique) ou d'une voiture électrique. Sans ce bloc, ConsoElec n'a encore rien partagé : ne l'invente pas.`;
+
+/** Bloc des données de ConsoElec, avec leur âge, ou chaîne vide sans résumé. */
+function peerBlock(peer: ElecSummary | null, nowMs: number): string {
+  if (peer === null) {
+    return '';
+  }
+  const age = summaryAgeDays(peer, nowMs);
+  return `\n\n<donnees_consoelec ageJours="${age}">\n${JSON.stringify(peer)}\n</donnees_consoelec>`;
+}
+
+/** Contexte complet (rôle + données, et résumé de ConsoElec s'il existe) passé en `system` à Claude. */
 export function buildSystemPrompt(
   data: AppData,
   analysis: FullAnalysis,
   now: number,
   limits: SnapshotLimits = FULL_LIMITS,
+  peer: ElecSummary | null = null,
 ): string {
-  return `${ROLE}\n\n<donnees>\n${JSON.stringify(buildDataSnapshot(data, analysis, now, limits))}\n</donnees>`;
+  const snapshot = JSON.stringify(buildDataSnapshot(data, analysis, now, limits));
+  const nowMs = dayNumberToDate(now).getTime();
+  return `${ROLE}\n\n${LINK_ROLE}\n\n<donnees>\n${snapshot}\n</donnees>${peerBlock(peer, nowMs)}`;
 }

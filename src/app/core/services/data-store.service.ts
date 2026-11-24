@@ -140,7 +140,7 @@ export class DataStore {
 
   loadDemo(): void {
     const demo = buildDemoData(new Date());
-    this.update((d) => ({ ...demo, settings: { ...demo.settings, theme: d.settings.theme } }));
+    this.update((d) => ({ ...demo, demo: true, settings: { ...demo.settings, theme: d.settings.theme } }));
   }
 
   reset(): void {

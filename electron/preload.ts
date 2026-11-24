@@ -18,6 +18,10 @@ const api: ConsoMazoutApi = {
   theme: {
     set: (mode) => ipcRenderer.invoke('theme:set', mode),
   },
+  link: {
+    publish: (content) => ipcRenderer.invoke('link:publish', content),
+    read: (app) => ipcRenderer.invoke('link:read', app),
+  },
   ai: {
     status: () => ipcRenderer.invoke('ai:status'),
     setKey: (key) => ipcRenderer.invoke('ai:setKey', key),
